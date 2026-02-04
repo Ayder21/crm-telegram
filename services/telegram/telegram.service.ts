@@ -137,7 +137,7 @@ export class TelegramService {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    const messages = (history || []).reverse().map(m => ({
+    const messages = (history || []).reverse().map((m: any) => ({
       role: m.sender === 'customer' ? 'user' as const : 'assistant' as const,
       content: m.content
     }));
