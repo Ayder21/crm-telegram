@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { getUsers, updateUserSubscription, toggleAdminRole } from "@/app/actions/admin-actions"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "lucide-react" // Importing icon as badge placeholder or just use span
+import { Shield } from "lucide-react"
 
 export default function AdminPage() {
     const [users, setUsers] = useState<any[]>([])
