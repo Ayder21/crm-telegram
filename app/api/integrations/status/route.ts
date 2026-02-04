@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
     .select('id, platform, is_active, system_prompt, ai_enabled, knowledge_base_url, updated_at')
     .eq('user_id', userId);
 
-  const ig = integrations?.find(i => i.platform === 'instagram' && i.is_active);
-  const tg = integrations?.find(i => i.platform === 'tg_business' && i.is_active);
+  const ig = integrations?.find((i: any) => i.platform === 'instagram' && i.is_active);
+  const tg = integrations?.find((i: any) => i.platform === 'tg_business' && i.is_active);
 
   // Берем общие настройки из любой интеграции
   const anyIntegration = ig || tg;
