@@ -126,26 +126,40 @@ export function CRMBoard() {
                                                         {...provided.draggableProps}
                                                         {...provided.dragHandleProps}
                                                         className={cn(
-                                                            "bg-white p-3 rounded-lg shadow-sm border border-slate-200 group hover:shadow-md transition-all select-none",
+                                                            "bg-white p-3 rounded-lg shadow-sm border border-slate-200 group hover:shadow-md transition-all select-none relative",
                                                             snapshot.isDragging ? "rotate-2 shadow-xl ring-2 ring-primary/20 z-50" : ""
                                                         )}
                                                         style={provided.draggableProps.style}
                                                     >
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <div className={cn(
-                                                                "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold",
-                                                                item.integrations?.platform === 'instagram'
-                                                                    ? "bg-gradient-to-tr from-yellow-400 via-orange-500 to-purple-600"
-                                                                    : "bg-gradient-to-br from-blue-500 to-indigo-600"
-                                                            )}>
-                                                                {item.customer_name?.[0]?.toUpperCase()}
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <div className={cn(
+                                                                    "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm",
+                                                                    item.integrations?.platform === 'instagram'
+                                                                        ? "bg-gradient-to-tr from-yellow-400 via-orange-500 to-purple-600"
+                                                                        : "bg-gradient-to-br from-blue-500 to-indigo-600"
+                                                                )}>
+                                                                    {item.integrations?.platform === 'instagram' ? <Instagram size={14} /> : <MessageCircle size={14} />}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="font-semibold text-sm truncate text-slate-800">{item.customer_name || 'Без имени'}</p>
+                                                                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                                        ID: {item.external_chat_id?.slice(-4)}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="font-medium text-sm truncate">{item.customer_name}</p>
-                                                                <p className="text-[10px] text-slate-400">
-                                                                    {new Date(item.last_message_at).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
+                                                            {/* Mock Priority or Tag */}
+                                                            <div className="w-2 h-2 rounded-full bg-red-400" title="Hot Lead" />
+                                                        </div>
+
+                                                        <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center text-[10px] text-slate-500">
+                                                            <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded">
+                                                                <Calendar size={10} />
+                                                                {new Date(item.last_message_at).toLocaleDateString()}
+                                                            </span>
+                                                            <span className="font-mono opacity-50">
+                                                                {new Date(item.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 )}

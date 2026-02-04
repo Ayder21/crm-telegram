@@ -192,19 +192,23 @@ export function ChatSidebar({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t bg-background/50 backdrop-blur-sm grid grid-cols-2 gap-2">
-        <a href="/dashboard/board" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
-          <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-            <Search className="w-3.5 h-3.5" />
-          </span>
-          CRM Доска
-        </a>
-        <a href="/dashboard/settings" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
-          <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-            <User className="w-3.5 h-3.5" />
-          </span>
-          Настройки
+      <div className="p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <a href="/dashboard/board" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+            <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Search className="w-3.5 h-3.5" />
+            </span>
+            CRM Доска
+          </a>
+          <a href="/dashboard/settings" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+            <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+              <User className="w-3.5 h-3.5" />
+            </span>
+            Настройки
+          </a>
+        </div>
+        <a href="/dashboard/admin" className="flex items-center justify-center gap-2 text-[10px] font-medium text-slate-400 hover:text-red-600 transition-colors p-1">
+          Admin Panel
         </a>
       </div>
     </div>
