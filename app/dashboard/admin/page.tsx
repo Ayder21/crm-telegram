@@ -15,11 +15,15 @@ export default function AdminPage() {
         setLoading(true)
         setError(null)
         try {
-            const data = await getUsers()
-            setUsers(data || [])
+            const result = await getUsers()
+            if (result.error) {
+                setError(result.error)
+            } else {
+                setUsers(result.users || [])
+            }
         } catch (e: any) {
-            console.error("Failed to load users:", e)
-            setError(e.message || "Failed to load users")
+            console.error("Critical component error:", e)
+            setError("Unexpected client error")
         } finally {
             setLoading(false)
         }
@@ -135,8 +139,8 @@ export default function AdminPage() {
                                             <button
                                                 onClick={() => handleRole(user.id, user.role !== 'admin')}
                                                 className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-all ${user.role === 'admin'
-                                                        ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 shadow-sm'
-                                                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                                                    ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 shadow-sm'
+                                                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
                                                     }`}
                                             >
                                                 {user.role}

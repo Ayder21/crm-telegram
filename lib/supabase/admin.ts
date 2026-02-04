@@ -15,6 +15,12 @@ export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
     }
   })
   : new Proxy({} as any, {
-    get: () => { throw new Error("Supabase Admin not initialized. Check SUPABASE_SERVICE_ROLE_KEY.") }
+    get: (target, prop) => {
+      // Prevent crashes when React/Next.js probes for internal properties during SSR
+      if (prop === '$$typeof' || prop === 'then' || typeof prop === 'symbol') {
+        return undefined
+      }
+      throw new Error("Supabase Admin not initialized. Check SUPABASE_SERVICE_ROLE_KEY.")
+    }
   })
 

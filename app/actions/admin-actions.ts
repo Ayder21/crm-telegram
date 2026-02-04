@@ -38,8 +38,7 @@ async function checkAdmin(): Promise<{ error?: string, userId?: string }> {
 export async function getUsers() {
     const auth = await checkAdmin()
     if (auth.error) {
-        // We throw a specific string that we can catch and parse on the client
-        throw new Error(auth.error)
+        return { error: auth.error }
     }
 
     const { data: users, error } = await supabaseAdmin
@@ -49,15 +48,15 @@ export async function getUsers() {
 
     if (error) {
         console.error("[getUsers] Fetch Error:", error)
-        throw new Error("fetch_failed_" + error.message)
+        return { error: "fetch_failed_" + error.message }
     }
 
-    return users
+    return { users }
 }
 
 export async function updateUserSubscription(userId: string, status: 'active' | 'inactive' | 'trial', days = 30) {
     const auth = await checkAdmin()
-    if (auth.error) throw new Error(auth.error)
+    if (auth.error) return { error: auth.error }
 
     const endDate = new Date()
     endDate.setDate(endDate.getDate() + days)
@@ -70,21 +69,21 @@ export async function updateUserSubscription(userId: string, status: 'active' | 
         })
         .eq('id', userId)
 
-    if (error) throw new Error("update_subscription_failed_" + error.message)
+    if (error) return { error: "update_subscription_failed_" + error.message }
     revalidatePath('/dashboard/admin')
     return { success: true }
 }
 
 export async function toggleAdminRole(userId: string, isAdmin: boolean) {
     const auth = await checkAdmin()
-    if (auth.error) throw new Error(auth.error)
+    if (auth.error) return { error: auth.error }
 
     const { error } = await supabaseAdmin
         .from('profiles')
         .update({ role: isAdmin ? 'admin' : 'user' })
         .eq('id', userId)
 
-    if (error) throw new Error("update_role_failed_" + error.message)
+    if (error) return { error: "update_role_failed_" + error.message }
     revalidatePath('/dashboard/admin')
     return { success: true }
 }
