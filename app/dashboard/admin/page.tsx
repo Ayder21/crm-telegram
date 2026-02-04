@@ -99,6 +99,48 @@ export default function AdminPage() {
                 </Button>
             </div>
 
+            {/* Create User Section */}
+            <Card className="border-slate-200 shadow-sm mb-6">
+                <CardHeader>
+                    <CardTitle className="text-lg font-semibold">Create New User</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <form className="flex flex-wrap gap-4 items-end" onSubmit={async (e) => {
+                        e.preventDefault()
+                        const formData = new FormData(e.currentTarget)
+                        const email = formData.get('email') as string
+                        const password = formData.get('password') as string
+                        const name = formData.get('name') as string
+
+                        setLoading(true)
+                        const res = await (await import("@/app/actions/admin-actions")).createAdminUser(email, password, name)
+                        setLoading(false)
+
+                        if (res.error) {
+                            alert("Error: " + res.error)
+                        } else {
+                            alert("User created successfully!")
+                            refresh()
+                            e.currentTarget.reset()
+                        }
+                    }}>
+                        <div className="flex-1 min-w-[200px] space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+                            <input name="name" required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="John Doe" />
+                        </div>
+                        <div className="flex-1 min-w-[200px] space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
+                            <input name="email" type="email" required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="user@example.com" />
+                        </div>
+                        <div className="flex-1 min-w-[200px] space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Password</label>
+                            <input name="password" type="password" required minLength={6} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="••••••••" />
+                        </div>
+                        <Button type="submit" disabled={loading}>Create Account</Button>
+                    </form>
+                </CardContent>
+            </Card>
+
             <Card className="border-slate-200 shadow-sm overflow-hidden">
                 <CardHeader className="bg-white border-b border-slate-100 p-6">
                     <CardTitle className="text-xl font-semibold text-slate-800 flex items-center gap-2">

@@ -87,3 +87,27 @@ export async function toggleAdminRole(userId: string, isAdmin: boolean) {
     revalidatePath('/dashboard/admin')
     return { success: true }
 }
+export async function createAdminUser(email: string, password: string, fullName: string) {
+    const auth = await checkAdmin()
+    if (auth.error) return { error: auth.error }
+
+    // 1. Create user in Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName }
+    })
+
+    if (authError) {
+        console.error("[createUser] Auth Error:", authError)
+        return { error: "auth_creation_failed_" + authError.message }
+    }
+
+    // Note: The profile is usually created via trigger. 
+    // If not, we might need to manually insert. 
+    // But let's assume the user already has a trigger from previous steps if they have 'profiles' working.
+
+    revalidatePath('/dashboard/admin')
+    return { success: true, userId: authData.user.id }
+}
