@@ -10,11 +10,20 @@ export default function AdminPage() {
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
+    const [error, setError] = useState<string | null>(null)
+
     const refresh = async () => {
         setLoading(true)
-        const data = await getUsers()
-        setUsers(data || [])
-        setLoading(false)
+        setError(null)
+        try {
+            const data = await getUsers()
+            setUsers(data || [])
+        } catch (e: any) {
+            console.error("Failed to load users:", e)
+            setError(e.message || "Failed to load users")
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
@@ -34,6 +43,14 @@ export default function AdminPage() {
     }
 
     if (loading) return <div className="p-8">Loading admin panel...</div>
+
+    if (error) return (
+        <div className="p-8 text-red-500">
+            <h2 className="text-xl font-bold">Error</h2>
+            <p>{error}</p>
+            <Button onClick={refresh} className="mt-4">Try Again</Button>
+        </div>
+    )
 
     return (
         <div className="p-8 space-y-6 bg-slate-50 min-h-screen">
