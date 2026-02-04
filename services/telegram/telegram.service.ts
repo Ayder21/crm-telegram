@@ -172,6 +172,7 @@ export class TelegramService {
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n') // End of paragraph -> newline
         .replace(/<p>/gi, '')     // Start of paragraph -> empty (or maybe newline if needed, but usually redundant with </p>)
+        .replace(/&nbsp;/gi, ' ')
 
       await this.sendTelegramMessage(chatId, sanitizedResponse, bizConnectionId);
     }
