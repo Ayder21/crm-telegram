@@ -232,7 +232,8 @@ export class TelegramService {
   public async setWebhook(url: string, botToken?: string) {
     const token = botToken || this.botToken;
     const apiUrl = `https://api.telegram.org/bot${token}/setWebhook`;
-    const webhookUrl = `${url}/api/webhooks/telegram`;
+    const baseUrl = url.replace(/\/$/, "");
+    const webhookUrl = `${baseUrl}/api/webhooks/telegram`;
 
     console.log(`Setting webhook to: ${webhookUrl}`);
 
