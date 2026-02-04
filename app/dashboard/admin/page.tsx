@@ -1,14 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-// import { getUsers, updateUserSubscription, toggleAdminRole } from "@/app/actions/admin-actions"
+import { getUsers, updateUserSubscription, toggleAdminRole } from "@/app/actions/admin-actions"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Shield } from "lucide-react"
 
 export default function AdminPage() {
     const [users, setUsers] = useState<any[]>([])
-    const [loading, setLoading] = useState(false) // Set to false for debug
+    const [loading, setLoading] = useState(false)
 
     return (
         <div className="p-8 space-y-6 bg-slate-50 min-h-screen">
