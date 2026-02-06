@@ -4,6 +4,7 @@ import { telegramService } from '@/services/telegram/telegram.service';
 import { InstagramService } from '@/services/instagram/instagram.service';
 import { decrypt } from '@/lib/crypto';
 import { waitingCallChannelService } from '@/services/telegram/waiting-call-channel.service';
+import { updateLeadProfileFromMessage } from '@/services/crm/lead-profile.service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (saveError) throw saveError;
+    await updateLeadProfileFromMessage(conversation_id, content);
 
     await waitingCallChannelService.sync(conversation_id);
 

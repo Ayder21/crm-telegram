@@ -19,7 +19,6 @@ interface IntegrationStatus {
 export default function SettingsPage() {
     const [userId, setUserId] = useState<string | null>(null)
     const [status, setStatus] = useState<IntegrationStatus | null>(null)
-    const [loading, setLoading] = useState(true)
 
     const fetchStatus = async (uid: string) => {
         try {
@@ -30,8 +29,6 @@ export default function SettingsPage() {
             }
         } catch (e) {
             console.error(e);
-        } finally {
-            setLoading(false);
         }
     }
 

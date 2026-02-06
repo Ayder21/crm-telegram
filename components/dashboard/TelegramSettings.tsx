@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase/client"
 
 export function TelegramSettings({ userId }: { userId: string }) {
   const [botToken, setBotToken] = useState("")
-  const [integrationId, setIntegrationId] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [webhookUrl, setWebhookUrl] = useState("")
   const [saving, setSaving] = useState(false)
@@ -25,7 +24,6 @@ export function TelegramSettings({ userId }: { userId: string }) {
       .single()
 
     if (data && data.bot_token_encrypted) {
-      setIntegrationId(data.id)
       setIsConnected(true)
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       setWebhookUrl(`${baseUrl}/api/webhooks/telegram/${data.id}`)
@@ -59,15 +57,15 @@ export function TelegramSettings({ userId }: { userId: string }) {
       }
 
       // Update local state
-      setIntegrationId(data.integrationId)
       setWebhookUrl(data.webhookUrl)
       setIsConnected(true)
       setMessage(`✅ ${data.message}`)
       setBotToken("") // Clear for security
       setShowReconfigure(false)
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error"
       console.error(error)
-      setMessage(`❌ Ошибка: ${error.message}`)
+      setMessage(`❌ Ошибка: ${message}`)
     } finally {
       setSaving(false)
     }

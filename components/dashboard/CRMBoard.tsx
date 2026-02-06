@@ -3,12 +3,28 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
-import { Card, CardContent } from "@/components/ui/card" // Assuming these exist or will use simple divs
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { cn } from "@/lib/utils"
-import { MessageCircle, Instagram, Phone, Calendar, CheckCircle, XCircle } from "lucide-react"
+import { MessageCircle, Instagram, Calendar } from "lucide-react"
 
-const COLUMNS = [
+type ColumnStatus = 'new' | 'interested' | 'waiting_call' | 'scheduled' | 'closed_won' | 'closed_lost'
+
+type Column = {
+    id: ColumnStatus
+    title: string
+    color: string
+}
+
+type ConversationCard = {
+    id: string
+    status: ColumnStatus
+    customer_name: string | null
+    external_chat_id: string | null
+    last_message_at: string
+    integrations: { platform: "instagram" | "tg_business" | string } | null
+}
+
+const COLUMNS: Column[] = [
     { id: 'new', title: 'Новые', color: 'bg-slate-100 dark:bg-slate-800' },
     { id: 'interested', title: 'Интерес', color: 'bg-yellow-50 dark:bg-yellow-900/10' },
     { id: 'waiting_call', title: 'Ждет Звонка', color: 'bg-red-50 dark:bg-red-900/10' },
@@ -18,50 +34,64 @@ const COLUMNS = [
 ]
 
 export function CRMBoard() {
-    const [columns, setColumns] = useState<Record<string, any[]>>({})
+    const [columns, setColumns] = useState<Record<ColumnStatus, ConversationCard[]>>({
+        new: [],
+        interested: [],
+        waiting_call: [],
+        scheduled: [],
+        closed_won: [],
+        closed_lost: []
+    })
     const [loading, setLoading] = useState(true)
 
-    const fetchItems = async () => {
-        const { data } = await supabase
-            .from('conversations')
-            .select(`
-            *,
-            integrations (platform)
-        `)
-            .order('last_message_at', { ascending: false });
-
-        if (data) {
-            const cols: Record<string, any[]> = {};
-            COLUMNS.forEach(c => cols[c.id] = []);
-
-            data.forEach(item => {
-                const status = item.status || 'new';
-                if (cols[status]) {
-                    cols[status].push(item);
-                } else {
-                    // Fallback for unknown status
-                    if (!cols['new']) cols['new'] = [];
-                    cols['new'].push(item);
-                }
-            });
-            setColumns(cols);
-        }
-        setLoading(false);
-    }
-
     useEffect(() => {
-        fetchItems()
+        let cancelled = false
+        const fetchItems = async () => {
+            const { data } = await supabase
+                .from('conversations')
+                .select(`
+                *,
+                integrations (platform)
+            `)
+                .order('last_message_at', { ascending: false });
+
+            if (!data || cancelled) {
+                if (!cancelled) setLoading(false)
+                return
+            }
+
+            const cols: Record<ColumnStatus, ConversationCard[]> = {
+                new: [],
+                interested: [],
+                waiting_call: [],
+                scheduled: [],
+                closed_won: [],
+                closed_lost: []
+            }
+
+            for (const item of data as ConversationCard[]) {
+                const status: ColumnStatus = (item.status && cols[item.status]) ? item.status : 'new'
+                cols[status].push({ ...item, status })
+            }
+
+            setColumns(cols)
+            setLoading(false)
+        }
+        void fetchItems()
+        return () => {
+            cancelled = true
+        }
     }, [])
 
-    const onDragEnd = async (result: any) => {
+    const onDragEnd = async (result: DropResult) => {
         const { source, destination, draggableId } = result;
 
         if (!destination) return;
         if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
         // Optimistic Update
-        const sourceColId = source.droppableId;
-        const destColId = destination.droppableId;
+        const sourceColId = source.droppableId as ColumnStatus;
+        const destColId = destination.droppableId as ColumnStatus;
 
         const sourceItems = [...columns[sourceColId]];
         const destItems = sourceColId === destColId ? sourceItems : [...columns[destColId]];
@@ -122,7 +152,7 @@ export function CRMBoard() {
                                             snapshot.isDraggingOver ? "bg-black/5" : ""
                                         )}
                                     >
-                                        {columns[col.id]?.map((item, index) => (
+                                        {columns[col.id].map((item, index) => (
                                             <Draggable key={item.id} draggableId={item.id} index={index}>
                                                 {(provided, snapshot) => (
                                                     <div

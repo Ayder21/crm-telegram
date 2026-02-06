@@ -7,6 +7,16 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.warn("Supabase Admin keys missing! Check env vars.")
 }
 
+const fallbackClient = new Proxy({} as object, {
+  get: (_target, prop) => {
+    // Prevent crashes when React/Next.js probes for internal properties during SSR
+    if (prop === '$$typeof' || prop === 'then' || typeof prop === 'symbol') {
+      return undefined
+    }
+    throw new Error("Supabase Admin not initialized. Check SUPABASE_SERVICE_ROLE_KEY.")
+  }
+}) as unknown as ReturnType<typeof createClient>
+
 export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
   ? createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
@@ -14,13 +24,4 @@ export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
       persistSession: false
     }
   })
-  : new Proxy({} as any, {
-    get: (target, prop) => {
-      // Prevent crashes when React/Next.js probes for internal properties during SSR
-      if (prop === '$$typeof' || prop === 'then' || typeof prop === 'symbol') {
-        return undefined
-      }
-      throw new Error("Supabase Admin not initialized. Check SUPABASE_SERVICE_ROLE_KEY.")
-    }
-  })
-
+  : fallbackClient

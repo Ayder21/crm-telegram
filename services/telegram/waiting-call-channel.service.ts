@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import { extractLeadProfilePatch, type LeadProfile } from "@/services/crm/lead-profile.service"
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
 const WAITING_CALL_CHANNEL_ID = process.env.TELEGRAM_WAITING_CALL_CHANNEL_ID || ""
@@ -12,7 +13,8 @@ type ConversationRow = {
   last_message_at: string | null
   waiting_call_channel_message_id: number | null
   waiting_call_channel_chat_id: string | null
-  integrations: { platform: string | null } | null
+  lead_profile: LeadProfile | null
+  integrations: { platform: string | null }[] | null
 }
 
 type MessageRow = {
@@ -30,8 +32,6 @@ type TelegramApiResponse = {
   }
   description?: string
 }
-
-const PHONE_REGEX = /(?:\+|\b)(?:998|7|8)\d{9}\b|\+?\d{10,15}/
 
 function escapeHtml(text: string): string {
   return text
@@ -55,14 +55,6 @@ function normalizeStatus(status: string | null): string {
   return status || "не указан"
 }
 
-function extractPhone(messages: MessageRow[]): string | null {
-  for (const message of messages) {
-    const match = message.content.match(PHONE_REGEX)
-    if (match?.[0]) return match[0]
-  }
-  return null
-}
-
 function extractUsername(messages: MessageRow[]): string | null {
   for (const message of messages) {
     if (message.sender !== "customer") continue
@@ -74,23 +66,62 @@ function extractUsername(messages: MessageRow[]): string | null {
   return null
 }
 
+function aggregateLeadProfile(messages: MessageRow[]): Partial<LeadProfile> {
+  const profile: Partial<LeadProfile> = {}
+  for (const message of messages) {
+    const patch = extractLeadProfilePatch(message.content)
+    Object.assign(profile, patch)
+    if (message.sender === "customer") {
+      const username = message.metadata?.username
+      if (typeof username === "string" && username.trim()) {
+        profile.username = username.startsWith("@") ? username : `@${username}`
+      }
+    }
+  }
+  return profile
+}
+
+function clientTypeLabel(value?: LeadProfile["client_type"]): string | null {
+  if (value === "legal") return "Юрлицо"
+  if (value === "individual") return "Физлицо"
+  return null
+}
+
+function surfaceLabel(value?: LeadProfile["installation_surface"]): string | null {
+  if (value === "roof") return "Крыша"
+  if (value === "ground") return "Земля"
+  return null
+}
+
 function buildProfileText(conversation: ConversationRow, messages: MessageRow[]): string {
-  const phone = extractPhone(messages) || "не найден"
-  const username = extractUsername(messages) || "не указан"
+  const inferred = aggregateLeadProfile(messages)
+  const profile = { ...(conversation.lead_profile ?? {}), ...inferred }
+  const phone = profile.phone || "не найден"
+  const username = profile.username || extractUsername(messages) || "не указан"
   const customerMessages = messages.filter((item) => item.sender === "customer")
   const latestCustomerMessage = customerMessages[0]?.content || "нет сообщений"
-  const platform = conversation.integrations?.platform === "instagram" ? "Instagram" : "Telegram"
+  const platform = conversation.integrations?.[0]?.platform === "instagram" ? "Instagram" : "Telegram"
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ""
   const conversationUrl = appUrl ? `${appUrl.replace(/\/$/, "")}/dashboard` : ""
+
+  const clientType = clientTypeLabel(profile.client_type)
+  const surface = surfaceLabel(profile.installation_surface)
+  const detailLines = [
+    clientType ? `<b>Клиент:</b> ${escapeHtml(clientType)}` : "",
+    profile.power ? `<b>Мощность:</b> ${escapeHtml(profile.power)}` : "",
+    profile.location ? `<b>Локация:</b> ${escapeHtml(profile.location)}` : "",
+    profile.station_type ? `<b>Тип станции:</b> ${escapeHtml(profile.station_type)}` : "",
+    surface ? `<b>Поверхность:</b> ${escapeHtml(surface)}` : ""
+  ].filter(Boolean)
 
   return [
     "📞 <b>Анкета клиента</b>",
     "",
     `<b>Имя:</b> ${escapeHtml(conversation.customer_name || "Без имени")}`,
     `<b>Платформа:</b> ${escapeHtml(platform)}`,
-    `<b>Внешний ID:</b> <code>${escapeHtml(conversation.external_chat_id)}</code>`,
     `<b>Username:</b> ${escapeHtml(username)}`,
     `<b>Телефон:</b> <code>${escapeHtml(phone)}</code>`,
+    ...detailLines,
     `<b>Статус:</b> ${escapeHtml(normalizeStatus(conversation.status))}`,
     `<b>Создан:</b> ${escapeHtml(formatDate(conversation.created_at))}`,
     `<b>Последняя активность:</b> ${escapeHtml(formatDate(conversation.last_message_at))}`,
@@ -129,6 +160,7 @@ export class WaitingCallChannelService {
         last_message_at,
         waiting_call_channel_message_id,
         waiting_call_channel_chat_id,
+        lead_profile,
         integrations (platform)
       `)
       .eq("id", conversationId)
@@ -199,6 +231,9 @@ export class WaitingCallChannelService {
         if (editResult.ok) return
 
         const reason = editResult.data.description || "unknown_error"
+        if (/message is not modified/i.test(reason)) {
+          return
+        }
         console.warn("[WaitingCall] edit failed, trying send:", reason)
       }
 

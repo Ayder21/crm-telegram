@@ -17,10 +17,15 @@ async function main() {
             messages: [{ role: "user", content: "Hello" }],
         });
         console.log("Success! Response:", completion.choices[0].message.content);
-    } catch (error: any) {
-        console.error("OpenAI Error:", error.message);
-        if (error.code) console.error("Error Code:", error.code);
-        if (error.type) console.error("Error Type:", error.type);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "unknown_error";
+        console.error("OpenAI Error:", message);
+        if (typeof error === "object" && error !== null && "code" in error) {
+            console.error("Error Code:", (error as { code?: unknown }).code);
+        }
+        if (typeof error === "object" && error !== null && "type" in error) {
+            console.error("Error Type:", (error as { type?: unknown }).type);
+        }
     }
 }
 

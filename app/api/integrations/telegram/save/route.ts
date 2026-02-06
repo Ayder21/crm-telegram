@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { encrypt, decrypt } from '@/lib/encryption';
 
+type TelegramIntegrationRow = {
+    id: string;
+    bot_token_encrypted: string | null;
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { userId, botToken, knowledgeBaseUrl } = await req.json();
@@ -18,7 +23,7 @@ export async function POST(req: NextRequest) {
             .eq('platform', 'tg_business')
             .single();
 
-        const updates: any = {
+        const updates: Record<string, string | boolean> = {
             is_active: true,
         };
 
@@ -34,17 +39,18 @@ export async function POST(req: NextRequest) {
         let tokenToUse = botToken;
 
         if (existing) {
+            const existingIntegration = existing as TelegramIntegrationRow
             // Update existing integration
             await supabaseAdmin
                 .from('integrations')
                 .update(updates)
-                .eq('id', existing.id);
+                .eq('id', existingIntegration.id);
 
-            integrationId = existing.id;
+            integrationId = existingIntegration.id;
 
             // If no new token provided, use existing one
-            if (!botToken && existing.bot_token_encrypted) {
-                tokenToUse = decrypt(existing.bot_token_encrypted);
+            if (!botToken && existingIntegration.bot_token_encrypted) {
+                tokenToUse = decrypt(existingIntegration.bot_token_encrypted);
             }
         } else {
             // Create new integration
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
                 }
             );
 
-            const telegramData = await telegramResponse.json();
+            const telegramData = await telegramResponse.json() as { ok?: boolean; description?: string };
             console.log('📡 Telegram response:', telegramData);
 
             if (!telegramData.ok) {
@@ -106,8 +112,9 @@ export async function POST(req: NextRequest) {
             integrationId,
             message: 'Настройки сохранены',
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('Save integration error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

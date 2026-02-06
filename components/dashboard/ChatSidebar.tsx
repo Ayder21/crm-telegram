@@ -6,6 +6,21 @@ import { cn } from "@/lib/utils"
 import { MessageCircle, Instagram, User, Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
+type ConversationMessage = {
+  content: string
+  created_at: string
+}
+
+type ConversationRow = {
+  id: string
+  customer_name: string | null
+  status: string | null
+  last_message_at: string | null
+  integrations: { platform: "instagram" | "tg_business" | string } | null
+  messages: ConversationMessage[]
+  lastMessage?: ConversationMessage
+}
+
 export function ChatSidebar({
   onSelectChat,
   selectedChatId
@@ -13,7 +28,7 @@ export function ChatSidebar({
   onSelectChat: (id: string) => void,
   selectedChatId?: string
 }) {
-  const [conversations, setConversations] = useState<any[]>([])
+  const [conversations, setConversations] = useState<ConversationRow[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
 
@@ -35,9 +50,9 @@ export function ChatSidebar({
         // Post-process to get the actual last message since Supabase might return all messages
         // or we can rely on order if we could limit in nested query (complex in client)
         // Simple way: client side sort for the preview
-        const processed = data.map(conv => {
+        const processed = (data as ConversationRow[]).map((conv) => {
           const msgs = conv.messages || [];
-          const lastMsg = msgs.sort((a: any, b: any) =>
+          const lastMsg = msgs.sort((a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )[0];
           return { ...conv, lastMessage: lastMsg }
@@ -61,7 +76,7 @@ export function ChatSidebar({
 
     // Instagram Polling
     const syncInstagram = async () => {
-      try { await fetch('/api/cron/instagram'); } catch (e) { }
+      try { await fetch('/api/cron/instagram'); } catch { }
     };
     syncInstagram();
     const interval = setInterval(syncInstagram, 15000);

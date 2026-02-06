@@ -1,17 +1,37 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Send, MoreVertical, Phone, Video, Paperclip, Smile } from "lucide-react"
 
+type MessageRow = {
+  id: string
+  sender: "assistant" | "customer" | "user"
+  content: string
+  created_at: string
+}
+
+type ChatInfo = {
+  customer_name: string | null
+  integrations: { platform: "tg_business" | "instagram" | string } | null
+}
+
 export function ChatWindow({ conversationId }: { conversationId: string }) {
-  const [messages, setMessages] = useState<any[]>([])
+  const [messages, setMessages] = useState<MessageRow[]>([])
   const [inputText, setInputText] = useState("")
-  const [chatInfo, setChatInfo] = useState<any>(null)
+  const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollIntoView({ behavior: "smooth" })
+      }
+    }, 100)
+  }, [])
 
   useEffect(() => {
     if (!conversationId) return
@@ -35,7 +55,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
 
-      if (data) setMessages(data)
+      if (data) setMessages(data as MessageRow[])
       scrollToBottom()
     }
 
@@ -49,7 +69,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new])
+        setMessages((prev) => [...prev, payload.new as MessageRow])
         scrollToBottom()
       })
       .subscribe()
@@ -57,15 +77,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId])
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollIntoView({ behavior: "smooth" })
-      }
-    }, 100)
-  }
+  }, [conversationId, scrollToBottom])
 
   const sendMessage = async () => {
     if (!inputText.trim()) return
@@ -85,8 +97,8 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         return;
       }
       setInputText("")
-    } catch (e) {
-      console.error(e)
+    } catch (error: unknown) {
+      console.error(error)
     }
   }
 
@@ -117,7 +129,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-zinc-950/30">
-        {messages.map((msg, i) => {
+        {messages.map((msg) => {
           const isMe = msg.sender === 'assistant' || msg.sender === 'user'; // Мы или бот
           return (
             <div

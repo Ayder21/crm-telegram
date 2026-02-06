@@ -1,6 +1,14 @@
 import { IgApiClient } from 'instagram-private-api';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateAIResponse } from '@/services/openai.service';
+import { updateLeadProfileFromMessage } from '@/services/crm/lead-profile.service';
+
+type InstagramSessionData = Record<string, unknown> | null | undefined;
+
+type ContextMessage = {
+  sender: 'customer' | 'assistant' | 'user';
+  content: string;
+};
 
 export class InstagramService {
   private ig: IgApiClient;
@@ -15,7 +23,7 @@ export class InstagramService {
   }
 
   // Инициализация клиента
-  async initialize(username: string, passwordOrSessionId?: string, sessionData?: any) {
+  async initialize(username: string, passwordOrSessionId?: string, sessionData?: InstagramSessionData) {
     this.ig.state.generateDevice(username);
 
     if (sessionData) {
@@ -38,8 +46,9 @@ export class InstagramService {
         this.myUserId = currentUser.pk;
         console.log(`Logged in as ${currentUser.username} (PK: ${this.myUserId}) via Cookie!`);
         await this.saveSession();
-      } catch (e: any) {
-        console.error("Cookie Login Failed:", e.message);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "unknown_error";
+        console.error("Cookie Login Failed:", message);
         throw new Error("Invalid Session ID or IP Blocked");
       }
     }
@@ -82,6 +91,7 @@ export class InstagramService {
         const messageId = lastItem.item_id;
         const senderName = thread.users.find(u => u.pk === lastItem.user_id)?.username || "Unknown";
         const content = lastItem.text;
+        if (!content) continue;
 
         const conversationId = await this.getOrCreateConversation(externalChatId, senderName);
 
@@ -105,6 +115,7 @@ export class InstagramService {
           content: content,
           metadata: { message_id: messageId }
         });
+        await updateLeadProfileFromMessage(conversationId, content, { username: senderName });
 
         // AI Logic
         if (aiEnabled) {
@@ -115,7 +126,7 @@ export class InstagramService {
             .order('created_at', { ascending: false })
             .limit(10);
 
-          const contextMessages = (history || []).reverse().map((m: any) => ({
+          const contextMessages = (history || []).reverse().map((m: ContextMessage) => ({
             role: m.sender === 'customer' ? 'user' as const : 'assistant' as const,
             content: m.content
           }));
@@ -131,13 +142,14 @@ export class InstagramService {
             sender: 'assistant',
             content: aiResponse
           });
+          await updateLeadProfileFromMessage(conversationId, aiResponse);
         } else {
           console.log("[IG] AI Disabled, skipping reply.");
         }
       }
-    } catch (e: any) {
-      console.error("[IG] Error checking messages:", e);
-      throw e;
+    } catch (error: unknown) {
+      console.error("[IG] Error checking messages:", error);
+      throw error;
     }
   }
 

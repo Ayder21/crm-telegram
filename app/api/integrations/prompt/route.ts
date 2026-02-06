@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
     // Собираем объект обновления динамически
-    const updates: any = { updated_at: new Date().toISOString() };
+    const updates: Record<string, string | boolean> = { updated_at: new Date().toISOString() };
     if (prompt !== undefined) updates.system_prompt = prompt;
     if (aiEnabled !== undefined) updates.ai_enabled = aiEnabled;
     if (knowledgeBase !== undefined) updates.knowledge_base_url = knowledgeBase;
@@ -24,8 +24,9 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error"
     console.error("Settings Update Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

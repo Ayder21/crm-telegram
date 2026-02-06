@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, message: 'Integration active and webhook set' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error("TG Connect Error:", error);
-        return NextResponse.json({ error: error.message || 'Unknown error' }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

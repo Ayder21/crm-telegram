@@ -2,14 +2,34 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { TelegramUpdate, TelegramMessage } from '@/types/telegram';
 import { generateAIResponse } from '@/services/openai.service';
 import { waitingCallChannelService } from '@/services/telegram/waiting-call-channel.service';
+import { updateLeadProfileFromMessage } from '@/services/crm/lead-profile.service';
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+type IntegrationConfig = {
+  id: string;
+  ai_enabled?: boolean;
+  system_prompt?: string | null;
+  knowledge_base_url?: string | null;
+  session_data?: { business_connection_id?: string } | null;
+}
+
+type MessageContextRow = {
+  sender: 'customer' | 'assistant' | 'user';
+  content: string;
+}
+
+type TelegramApiBody = {
+  chat_id: string;
+  text?: string;
+  parse_mode?: 'HTML';
+  action?: 'typing';
+  business_connection_id?: string;
+};
 
 export class TelegramService {
   private botToken: string = process.env.TELEGRAM_BOT_TOKEN || '';
-  private integration: any;
+  private integration: IntegrationConfig | null = null;
 
-  async handleWebhook(update: TelegramUpdate, integration?: any, botToken?: string) {
+  async handleWebhook(update: TelegramUpdate, integration?: IntegrationConfig, botToken?: string) {
     // Store integration and token for this webhook request
     if (integration) this.integration = integration;
     if (botToken) this.botToken = botToken;
@@ -30,7 +50,7 @@ export class TelegramService {
     }
   }
 
-  private async handleBusinessConnection(connection: any) {
+  private async handleBusinessConnection(connection: unknown) {
     console.log("Business Connection Update:", connection);
     // В реальном продакшене тут нужно обновлять session_data у конкретной интеграции
   }
@@ -52,7 +72,7 @@ export class TelegramService {
     if (text === '/reset' || text === '/clear') {
       // Получаем ID (повторная логика, можно вынести, но для скорости оставим тут часть)
       const senderName = message.from?.first_name || "Unknown";
-      let conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
+      const conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
 
       console.log(`Clearing context for conversation ${conversationId}`);
 
@@ -69,7 +89,7 @@ export class TelegramService {
     const senderName = message.from?.first_name || "Unknown";
 
     // 2. Находим или создаем conversation
-    let conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
+    const conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
 
     // UX: Показываем "печатает..." в правильном чате
     const bizConnectionId = connectionId || integration.session_data?.business_connection_id;
@@ -101,6 +121,7 @@ export class TelegramService {
         last_name: message.from?.last_name
       }
     });
+    await updateLeadProfileFromMessage(conversationId, text, { username: message.from?.username || null });
 
     if (statusTouched) {
       console.log(`[WaitingCall] Status changed by phone rule for conversation ${conversationId}`);
@@ -142,7 +163,7 @@ export class TelegramService {
     return newConv.id;
   }
 
-  private async triggerAIReply(integration: any, conversationId: string, chatId: string, replyToMessageId: number, connectionId?: string) {
+  private async triggerAIReply(integration: IntegrationConfig, conversationId: string, chatId: string, _replyToMessageId: number, connectionId?: string) {
     // 1. Получаем контекст
     const { data: history } = await supabaseAdmin
       .from('messages')
@@ -151,14 +172,14 @@ export class TelegramService {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    const messages = (history || []).reverse().map((m: any) => ({
+    const messages = (history || []).reverse().map((m: MessageContextRow) => ({
       role: m.sender === 'customer' ? 'user' as const : 'assistant' as const,
       content: m.content
     }));
 
     // 2. Генерируем ответ
     const systemPrompt = integration.system_prompt || "You are a helpful assistant.";
-    const aiResponse = await generateAIResponse(systemPrompt, messages, integration.knowledge_base_url);
+    const aiResponse = await generateAIResponse(systemPrompt, messages, integration.knowledge_base_url ?? undefined);
 
     // 3.5. Обрабатываем смену статуса
     let finalResponse = aiResponse;
@@ -199,6 +220,9 @@ export class TelegramService {
       sender: 'assistant',
       content: finalResponse || "(Status Update Only)"
     });
+    if (finalResponse) {
+      await updateLeadProfileFromMessage(conversationId, finalResponse);
+    }
 
     await waitingCallChannelService.sync(conversationId);
   }
@@ -206,7 +230,7 @@ export class TelegramService {
   public async sendTelegramMessage(chatId: string, text: string, businessConnectionId?: string) {
     const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
 
-    const body: any = {
+    const body: TelegramApiBody = {
       chat_id: chatId,
       text: text,
       parse_mode: 'HTML',
@@ -226,14 +250,14 @@ export class TelegramService {
         const err = await res.text();
         console.error("Telegram API Error:", err);
       }
-    } catch (e) {
-      console.error("Fetch Error:", e);
+    } catch (error: unknown) {
+      console.error("Fetch Error:", error);
     }
   }
 
   public async sendTypingAction(chatId: string, businessConnectionId?: string) {
     try {
-      const body: any = { chat_id: chatId, action: 'typing' };
+      const body: TelegramApiBody = { chat_id: chatId, action: 'typing' };
       if (businessConnectionId) {
         body.business_connection_id = businessConnectionId;
       }
@@ -243,8 +267,8 @@ export class TelegramService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-    } catch (e) {
-      console.error("Error sending typing action:", e);
+    } catch (error: unknown) {
+      console.error("Error sending typing action:", error);
     }
   }
 
@@ -265,12 +289,12 @@ export class TelegramService {
           allowed_updates: ["message", "edited_message", "business_connection", "business_message", "edited_business_message"]
         })
       });
-      const data = await res.json();
+      const data: unknown = await res.json();
       console.log("SetWebhook Result:", data);
       return data;
-    } catch (e) {
-      console.error("SetWebhook Error:", e);
-      throw e;
+    } catch (error: unknown) {
+      console.error("SetWebhook Error:", error);
+      throw error;
     }
   }
 }
