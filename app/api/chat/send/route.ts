@@ -32,7 +32,24 @@ export async function POST(req: NextRequest) {
     // 2. Отправляем сообщение
     if (platform === 'tg_business') {
       // Для ТГ нам нужен business_connection_id из сессии
-      const connectionId = integration.session_data?.business_connection_id;
+      let connectionId: string | undefined = integration.session_data?.business_connection_id;
+
+      if (!connectionId) {
+        const { data: latestCustomerMessage } = await supabase
+          .from('messages')
+          .select('metadata')
+          .eq('conversation_id', conversation_id)
+          .eq('sender', 'customer')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const meta = latestCustomerMessage?.metadata as { business_connection_id?: string } | null
+        if (meta?.business_connection_id) {
+          connectionId = meta.business_connection_id
+        }
+      }
+
       await telegramService.sendTelegramMessage(conversation.external_chat_id, content, connectionId);
     }
     else if (platform === 'instagram') {

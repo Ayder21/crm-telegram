@@ -51,8 +51,52 @@ export class TelegramService {
   }
 
   private async handleBusinessConnection(connection: unknown) {
-    console.log("Business Connection Update:", connection);
-    // В реальном продакшене тут нужно обновлять session_data у конкретной интеграции
+    const integration = this.integration;
+    if (!integration) {
+      console.warn("Business connection update ignored: no integration context.");
+      return;
+    }
+
+    const connectionId = this.extractConnectionId(connection);
+    if (!connectionId) {
+      console.warn("Business connection update ignored: missing connection id.");
+      return;
+    }
+
+    await this.persistBusinessConnectionId(connectionId);
+  }
+
+  private extractConnectionId(connection: unknown): string | null {
+    if (!connection || typeof connection !== "object") return null;
+    const id = (connection as { id?: unknown }).id;
+    return typeof id === "string" && id.length > 0 ? id : null;
+  }
+
+  private async persistBusinessConnectionId(connectionId: string): Promise<void> {
+    const integration = this.integration;
+    if (!integration) return;
+
+    if (integration.session_data?.business_connection_id === connectionId) {
+      return;
+    }
+
+    const nextSessionData = {
+      ...(integration.session_data || {}),
+      business_connection_id: connectionId
+    };
+
+    const { error } = await supabaseAdmin
+      .from("integrations")
+      .update({ session_data: nextSessionData })
+      .eq("id", integration.id);
+
+    if (error) {
+      console.error("Failed to persist business_connection_id:", error.message);
+      return;
+    }
+
+    integration.session_data = nextSessionData;
+    console.log(`business_connection_id updated for integration ${integration.id}`);
   }
 
   private async processIncomingMessage(message: TelegramMessage, connectionId?: string) {
@@ -115,6 +159,7 @@ export class TelegramService {
       content: text,
       metadata: {
         message_id: message.message_id,
+        business_connection_id: connectionId || integration.session_data?.business_connection_id,
         telegram_user_id: message.from?.id,
         username: message.from?.username,
         first_name: message.from?.first_name,
@@ -300,3 +345,6 @@ export class TelegramService {
 }
 
 export const telegramService = new TelegramService();
+    if (connectionId) {
+      await this.persistBusinessConnectionId(connectionId);
+    }

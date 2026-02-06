@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { MessageCircle, Instagram, User, Search, Loader2 } from "lucide-react"
+import { MessageCircle, Instagram, User, Search, Loader2, Shield } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
 type ConversationMessage = {
@@ -36,6 +36,10 @@ function formatConversationTimestamp(value: string | null): string {
   }
 
   return timestamp.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
+}
+
+function getLastActivityAt(conversation: ConversationRow): string | null {
+  return conversation.lastMessage?.created_at || conversation.last_message_at
 }
 
 export function ChatSidebar({
@@ -73,6 +77,10 @@ export function ChatSidebar({
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )[0];
           return { ...conv, lastMessage: lastMsg }
+        }).sort((a, b) => {
+          const aTime = getLastActivityAt(a) ? new Date(getLastActivityAt(a) as string).getTime() : 0
+          const bTime = getLastActivityAt(b) ? new Date(getLastActivityAt(b) as string).getTime() : 0
+          return bTime - aTime
         })
         setConversations(processed)
       }
@@ -179,7 +187,7 @@ export function ChatSidebar({
                   {conv.customer_name || "Неизвестный"}
                 </span>
                 <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap ml-2">
-                  {formatConversationTimestamp(conv.last_message_at)}
+                  {formatConversationTimestamp(getLastActivityAt(conv))}
                 </span>
               </div>
 
@@ -223,12 +231,12 @@ export function ChatSidebar({
       </div>
 
       <div className="p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <a href="/dashboard/board" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
               <Search className="w-3.5 h-3.5" />
             </span>
-            CRM Доска
+            CRM
           </a>
           <a href="/dashboard/settings" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -236,10 +244,13 @@ export function ChatSidebar({
             </span>
             Настройки
           </a>
+          <a href="/dashboard/admin" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+            <span className="w-6 h-6 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+              <Shield className="w-3.5 h-3.5" />
+            </span>
+            Admin
+          </a>
         </div>
-        <a href="/dashboard/admin" className="flex items-center justify-center gap-2 text-[10px] font-medium text-slate-400 hover:text-red-600 transition-colors p-1">
-          Admin Panel
-        </a>
       </div>
     </div>
   )
