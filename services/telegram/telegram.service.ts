@@ -345,6 +345,3 @@ export class TelegramService {
 }
 
 export const telegramService = new TelegramService();
-    if (connectionId) {
-      await this.persistBusinessConnectionId(connectionId);
-    }
