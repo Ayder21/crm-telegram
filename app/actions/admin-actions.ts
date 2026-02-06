@@ -4,7 +4,19 @@ import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
-async function checkAdmin(): Promise<{ error?: string, userId?: string }> {
+type AdminAuthCheck = { error?: string; userId?: string }
+
+export type ProfileRow = {
+    id: string
+    email: string | null
+    full_name: string | null
+    role: string | null
+    subscription_status: "active" | "inactive" | "trial" | null
+    subscription_ends_at: string | null
+    created_at: string | null
+}
+
+async function checkAdmin(): Promise<AdminAuthCheck> {
     try {
         const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -29,9 +41,10 @@ async function checkAdmin(): Promise<{ error?: string, userId?: string }> {
         }
 
         return { userId: user.id }
-    } catch (e: any) {
-        console.error("[AdminCheck] Global Crisis:", e)
-        return { error: "admin_check_internal_error_" + e.message }
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "unknown_error"
+        console.error("[AdminCheck] Global Crisis:", error)
+        return { error: "admin_check_internal_error_" + message }
     }
 }
 
@@ -43,7 +56,7 @@ export async function getUsers() {
 
     const { data: users, error } = await supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select('id,email,full_name,role,subscription_status,subscription_ends_at,created_at')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -51,7 +64,7 @@ export async function getUsers() {
         return { error: "fetch_failed_" + error.message }
     }
 
-    return { users }
+    return { users: (users ?? []) as ProfileRow[] }
 }
 
 export async function updateUserSubscription(userId: string, status: 'active' | 'inactive' | 'trial', days = 30) {
