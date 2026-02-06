@@ -7,73 +7,51 @@
 - **Frontend/Backend:** Next.js 16 (App Router)
 - **Database:** Supabase (PostgreSQL)
 - **AI:** OpenAI (GPT-4o)
-- **Styling:** Tailwind CSS + Shadcn UI
-- **Deploy:** Vercel (Production), Local + Ngrok (Dev)
+- **Styling:** Vanilla CSS + Shadcn UI
+- **Auth:** Supabase SSR (Cookies sync)
 
-## 2. Локальная разработка
+## 2. Админ-панель (`/dashboard/admin`)
+Доступна только пользователям с ролью `admin` в таблице `profiles`.
 
-### Запуск
-```bash
-npm install
-npm run dev
+**Возможности:**
+- Просмотр всех зарегистрированных пользователей.
+- Управление подписками: `Trial` (14 дней), `Full` (30 дней), `Inactive`.
+- Управление правами: Назначение/снятие роли `admin`.
+- **Регистрация новых сотрудников:** Прямое создание аккаунтов (Auth + Profile) из панели.
+
+**Как выдать себе админа (SQL):**
+```sql
+UPDATE profiles SET role = 'admin' WHERE email = 'your-email@example.com';
 ```
-Сервер будет доступен: `http://localhost:3000`
 
-### Связь с Telegram (Bot)
-Чтобы бот работал локально, нужен публичный HTTPS URL. Используем **ngrok**:
-```bash
-ngrok http 3000
-```
-Скопируйте URL (например, `https://d8cc...ngrok-free.app`) и обновите `NEXT_PUBLIC_APP_URL` в `.env.local`.
-Затем зайдите в `http://localhost:3000/dashboard/settings` -> Telegram -> "Настроить заново".
+## 3. Архитектура и Auth
+- **Middleware:** `middleware.ts` отвечает за синхронизацию сессии Supabase между браузером и сервером через Cookies. Это критично для работы Server Actions.
+- **Supabase Clients:**
+  - `lib/supabase/client.ts` — для клиентских компонентов (`createBrowserClient`).
+  - `lib/supabase/server.ts` — для API и Server Actions (`createServerClient`).
+  - `lib/supabase/admin.ts` — сервисный клиент с `SERVICE_ROLE_KEY` для операций в обход RLS (используется только на сервере!).
 
-## 3. Архитектура
+## 4. Деплой и Окружение (Vercel)
+При деплое на Vercel ОБЯЗАТЕЛЬНО добавьте эти переменные:
+- `SUPABASE_SERVICE_ROLE_KEY` — Секретный ключ (Project Settings -> API).
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Публичные ключи.
+- `OPENAI_API_KEY` — Для работы AI.
+- `ENCRYPTION_KEY` — Для шифрования токенов в БД.
+- `NEXT_PUBLIC_APP_URL` — URL вашего сайта (без слеша на конце).
 
-### Основные папки
-- `app/` — Next.js App Router (страницы и API).
-  - `app/api/webhooks/telegram` — Обработчик входящих сообщений.
-- `services/` — Бизнес-логика.
-  - `telegram/telegram.service.ts` — Главный сервис. Отправка сообщений, AI логика, слэш-команды.
-  - `openai.service.ts` — Генерация ответов AI.
-- `lib/` — Утилиты (Supabase client, Encryption).
+**Workflow:** `git push origin main` -> Автоматический деплой.
 
-### База данных (Supabase)
-Ключевые таблицы:
-- `integrations` — Настройки подключений Telegram Business. Хранит `bot_token` (зашифрованный).
-- `conversations` — Диалоги с клиентами.
-- `messages` — История сообщений.
+## 5. Инструкция для новой сессии AI
+Если вы начинаете новый чат с ИИ, скопируйте этот текст:
 
-## 4. Деплой (Vercel)
+> "Я работаю над CRM-проектом (Next.js 16 + Supabase SSR). 
+> В проекте уже внедрена админ-панель (/dashboard/admin), настроена синхронизация сессий через middleware.ts и реализованы Server Actions в app/actions/admin-actions.ts. 
+> База данных использует таблицу profiles для хранения ролей (user/admin) и статусов подписки (active/trial/inactive).
+> Текущая задача: [ОПИШИТЕ ВАШУ ЗАДАЧУ ЗДЕСЬ]"
 
-### Как обновлять
-1. Сделайте изменения локально.
-2. `git add . && git commit -m "..." && git push origin main`.
-3. Vercel автоматически подхватит и передеплоит.
-
-### Переменные окружения (Vercel)
-Все переменные описаны в файле `VERCEL_INSTRUCTIONS.md` (в корне или локально). Главное:
-- `OPENAI_API_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `SUPABASE_*`
-- `ENCRYPTION_KEY`
-- `NEXT_PUBLIC_APP_URL` (Важно: без слеша в конце, например `https://crm-telegram.vercel.app`)
-
-## 5. Важные нюансы (Troubleshooting)
-
-### Webhook URL
-В `telegram.service.ts` есть защита от двойных слешей. URL формируется как `${baseUrl}/api/...`. Если бот не отвечает, проверьте логи Vercel (Functions) и URL в настройках.
-
-### HTML Entities
-AI иногда возвращает `&nbsp;`, `<br>`. В `telegram.service.ts` (функция `triggerAIReply`) стоит `.replace()`, очищающий эти теги перед отправкой в Telegram, так как Telegram требует чистый HTML (или текст).
-
-### Vercel Starter Page
-Если после деплоя видна страница "Next.js Starter":
-- Проверьте `app/page.tsx` — там должен быть `redirect("/dashboard")`.
-- Убедитесь, что `package.json` содержит правильные зависимости, а не дефолтные.
-
-## 6. Полезные файлы
-- `VERCEL_INSTRUCTIONS.md` — Переменные для деплоя.
-- `legacy/` — Скрипты для старого хостинга (Anora/AWS).
+## 6. Важные нюансы
+- **Server Components:** Если видите ошибку "Server Components render", проверьте инициализацию `supabaseAdmin` и наличие `SERVICE_ROLE_KEY`.
+- **Telegram Webhooks:** При смене домена всегда обновляйте `NEXT_PUBLIC_APP_URL` и перепривязывайте бота в настройках CRM.
 
 ---
-*Created by Antigravity*
+*Updated by Antigravity*
