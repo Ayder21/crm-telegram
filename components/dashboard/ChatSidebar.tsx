@@ -21,6 +21,23 @@ type ConversationRow = {
   lastMessage?: ConversationMessage
 }
 
+function formatConversationTimestamp(value: string | null): string {
+  if (!value) return ""
+
+  const timestamp = new Date(value)
+  const now = new Date()
+  const isToday =
+    timestamp.getFullYear() === now.getFullYear() &&
+    timestamp.getMonth() === now.getMonth() &&
+    timestamp.getDate() === now.getDate()
+
+  if (isToday) {
+    return timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  }
+
+  return timestamp.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
+}
+
 export function ChatSidebar({
   onSelectChat,
   selectedChatId
@@ -162,9 +179,7 @@ export function ChatSidebar({
                   {conv.customer_name || "Неизвестный"}
                 </span>
                 <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap ml-2">
-                  {conv.last_message_at
-                    ? new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : ""}
+                  {formatConversationTimestamp(conv.last_message_at)}
                 </span>
               </div>
 
