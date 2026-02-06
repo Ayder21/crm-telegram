@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase/admin';
 import { telegramService } from '@/services/telegram/telegram.service';
 import { InstagramService } from '@/services/instagram/instagram.service';
 import { decrypt } from '@/lib/crypto';
+import { waitingCallChannelService } from '@/services/telegram/waiting-call-channel.service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,11 +67,13 @@ export async function POST(req: NextRequest) {
 
     if (saveError) throw saveError;
 
+    await waitingCallChannelService.sync(conversation_id);
+
     return NextResponse.json({ success: true });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Send Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Internal error"
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

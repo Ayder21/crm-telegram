@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { TelegramUpdate, TelegramMessage } from '@/types/telegram';
 import { generateAIResponse } from '@/services/openai.service';
+import { waitingCallChannelService } from '@/services/telegram/waiting-call-channel.service';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -66,7 +67,6 @@ export class TelegramService {
     }
 
     const senderName = message.from?.first_name || "Unknown";
-    const senderUsername = message.from?.username || "";
 
     // 2. Находим или создаем conversation
     let conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
@@ -78,12 +78,14 @@ export class TelegramService {
     // DETERMINISTIC RULE: If text contains phone number, set status to 'waiting_call'
     // Regex matches common formats: +7999..., 8999..., +998..., 99890...
     const phoneRegex = /(?:\+|\b)(?:998|7|8)\d{9}\b|\+?\d{10,15}/;
+    let statusTouched = false;
     if (phoneRegex.test(text)) {
       console.log(`[Rule] Phone number detected in "${text}". Force updating status to waiting_call.`);
       await supabaseAdmin
         .from('conversations')
         .update({ status: 'waiting_call' })
         .eq('id', conversationId);
+      statusTouched = true;
     }
 
     // 3. Сохраняем сообщение
@@ -91,8 +93,20 @@ export class TelegramService {
       conversation_id: conversationId,
       sender: 'customer', // Считаем все входящие от клиента
       content: text,
-      metadata: { message_id: message.message_id }
+      metadata: {
+        message_id: message.message_id,
+        telegram_user_id: message.from?.id,
+        username: message.from?.username,
+        first_name: message.from?.first_name,
+        last_name: message.from?.last_name
+      }
     });
+
+    if (statusTouched) {
+      console.log(`[WaitingCall] Status changed by phone rule for conversation ${conversationId}`);
+    }
+    // If a profile message already exists for this conversation, keep it up to date.
+    await waitingCallChannelService.sync(conversationId);
 
     // 5. Проверяем, включен ли AI
     if (!integration.ai_enabled) {
@@ -160,6 +174,8 @@ export class TelegramService {
         .from('conversations')
         .update({ status: newStatus })
         .eq('id', conversationId);
+
+      await waitingCallChannelService.sync(conversationId);
     }
 
     // 3. Отправляем в Telegram
@@ -183,6 +199,8 @@ export class TelegramService {
       sender: 'assistant',
       content: finalResponse || "(Status Update Only)"
     });
+
+    await waitingCallChannelService.sync(conversationId);
   }
 
   public async sendTelegramMessage(chatId: string, text: string, businessConnectionId?: string) {

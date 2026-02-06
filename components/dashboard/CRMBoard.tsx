@@ -82,14 +82,18 @@ export function CRMBoard() {
             });
         }
 
-        // Update DB
-        const { error } = await supabase
-            .from('conversations')
-            .update({ status: destColId })
-            .eq('id', draggableId);
+        // Update DB via server route to keep waiting_call channel message in sync
+        const response = await fetch('/api/conversations/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                conversation_id: draggableId,
+                status: destColId
+            })
+        });
 
-        if (error) {
-            console.error("Failed to update status:", error);
+        if (!response.ok) {
+            console.error("Failed to update status via API");
             // Revert state if needed (optional, but good for UX)
         } else {
             console.log("Status updated via Drag&Drop:", destColId);
