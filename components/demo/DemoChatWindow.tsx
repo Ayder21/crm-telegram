@@ -1,0 +1,111 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Send, MoreVertical, Phone, Video, Paperclip, Smile } from "lucide-react";
+import type { DemoConversation } from "@/components/demo/data";
+
+export function DemoChatWindow({ conversation }: { conversation: DemoConversation | null }) {
+  const [inputText, setInputText] = useState("");
+
+  const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+
+  if (!conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        Select a conversation to start chatting
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-background/50 backdrop-blur-3xl">
+      <div className="h-16 border-b flex items-center justify-between px-6 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+            {conversation.customer_name[0]?.toUpperCase() || "?"}
+          </div>
+          <div>
+            <h3 className="font-bold text-foreground text-base tracking-tight">{conversation.customer_name}</h3>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <p className="text-xs text-muted-foreground font-medium capitalize">
+                {conversation.integrations.platform === "tg_business" ? "Telegram Business" : "Instagram Direct"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-primary/10 rounded-full transition-colors">
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-primary/10 rounded-full transition-colors">
+            <Video className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="hover:text-foreground rounded-full transition-colors">
+            <MoreVertical className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-zinc-950/30">
+        {messages.map((msg) => {
+          const isMe = msg.sender === "assistant" || msg.sender === "user";
+          return (
+            <div key={msg.id} className={cn("flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300", isMe ? "justify-end" : "justify-start")}>
+              <div
+                className={cn(
+                  "max-w-[75%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm relative group transition-all",
+                  isMe
+                    ? "bg-primary text-primary-foreground rounded-br-sm hover:brightness-110"
+                    : "bg-white dark:bg-zinc-800 text-foreground border border-border/50 rounded-bl-sm",
+                )}
+              >
+                {msg.content}
+                <span
+                  className={cn(
+                    "text-[10px] absolute bottom-1 opacity-0 group-hover:opacity-70 transition-opacity whitespace-nowrap",
+                    isMe ? "right-full mr-3 text-muted-foreground" : "left-full ml-3 text-muted-foreground",
+                  )}
+                >
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="p-5 bg-background border-t">
+        <div className="flex gap-3 items-end bg-muted/40 p-2 rounded-2xl border border-border/50 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all shadow-sm">
+          <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground hover:text-primary hover:bg-background h-10 w-10 shrink-0">
+            <Paperclip className="w-5 h-5" />
+          </Button>
+          <Input
+            className="border-none bg-transparent shadow-none focus-visible:ring-0 text-foreground placeholder:text-muted-foreground/70 min-h-[40px] py-2"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Демо режим: отправка отключена"
+          />
+          <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground hover:text-primary hover:bg-background h-10 w-10 shrink-0">
+            <Smile className="w-5 h-5" />
+          </Button>
+          <Button
+            size="icon"
+            className={cn("rounded-xl h-10 w-10 shrink-0 transition-all shadow-sm", "bg-muted text-muted-foreground hover:bg-muted")}
+            disabled
+            title="В демо отправка отключена"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="text-center mt-2">
+          <span className="text-[10px] text-muted-foreground/60">Read-only demo • отправка отключена</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+

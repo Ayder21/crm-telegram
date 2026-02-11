@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DemoCRMPage } from "@/components/demo/DemoCRMPage";
+import { DemoDashboardPage } from "@/components/demo/DemoDashboardPage";
 
 export const metadata: Metadata = {
   title: "Demo CRM",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function DemoPage() {
-  return <DemoCRMPage />;
+  return <DemoDashboardPage />;
 }
