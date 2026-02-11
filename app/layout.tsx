@@ -6,8 +6,11 @@ import { cn } from "@/lib/utils";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "UzSales AI",
-  description: "Unified Chat Dashboard",
+  title: {
+    default: "Sellio | CRM для продаж в чатах",
+    template: "Sellio | %s",
+  },
+  description: "Sellio помогает вести Telegram и Instagram диалоги, контролировать воронку и повышать конверсию в оплату.",
 };
 
 export default function RootLayout({

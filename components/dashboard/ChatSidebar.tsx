@@ -236,7 +236,7 @@ export function ChatSidebar({
             <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
               <Search className="w-3.5 h-3.5" />
             </span>
-            CRM
+            Sellio
           </a>
           <a href="/dashboard/settings" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">

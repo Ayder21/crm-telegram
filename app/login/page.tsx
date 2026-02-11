@@ -39,7 +39,7 @@ export default function LoginPage() {
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-200">
           <Bot className="h-7 w-7" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">UzSales AI</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sellio</h1>
         <p className="text-slate-500">Единый центр управления чатами</p>
       </div>
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
       </Card>
       
       <p className="mt-8 text-xs text-slate-400">
-        &copy; 2024 UzSales AI. All rights reserved.
+        &copy; 2026 Sellio. All rights reserved.
       </p>
     </div>
   )
