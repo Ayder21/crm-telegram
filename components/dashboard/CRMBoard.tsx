@@ -135,9 +135,9 @@ export function CRMBoard() {
     return (
         <div className="h-full overflow-x-auto">
             <DragDropContext onDragEnd={onDragEnd}>
-                <div className="flex h-full gap-4 p-4 min-w-[1200px]">
+                <div className="flex h-full gap-3 sm:gap-4 p-3 sm:p-4 min-w-[920px] md:min-w-[1200px]">
                     {COLUMNS.map(col => (
-                        <div key={col.id} className={cn("flex flex-col w-80 rounded-xl", col.color)}>
+                        <div key={col.id} className={cn("flex flex-col w-72 sm:w-80 rounded-xl", col.color)}>
                             <div className="p-3 font-semibold text-slate-700 flex justify-between items-center">
                                 {col.title}
                                 <span className="text-xs bg-white/50 px-2 py-0.5 rounded-full">{columns[col.id]?.length || 0}</span>

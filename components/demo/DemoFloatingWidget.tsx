@@ -2,10 +2,10 @@ import { MessageCircle, ArrowLeft } from "lucide-react";
 
 export function DemoFloatingWidget() {
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[420px] max-w-[calc(100vw-1rem)] rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+    <div className="fixed bottom-3 right-3 left-3 sm:left-auto z-50 sm:w-[420px] rounded-2xl border-2 border-slate-300 bg-white p-4 sm:p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Demo Mode</p>
-      <h3 className="mt-1 text-base font-semibold text-slate-900">Это демо-версия CRM</h3>
-      <p className="mt-2 text-sm leading-relaxed text-slate-700">
+      <h3 className="mt-1 text-sm sm:text-base font-semibold text-slate-900">Это демо-версия CRM</h3>
+      <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700">
         Хотите пообщаться с демо-ботом менеджера женской одежды? Бот отвечает сразу в Telegram.
       </p>
       <div className="mt-4 grid gap-2.5">

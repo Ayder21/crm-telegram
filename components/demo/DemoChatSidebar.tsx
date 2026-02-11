@@ -36,11 +36,13 @@ export function DemoChatSidebar({
   selectedChatId,
   onSelectChat,
   activeMenu = "chats",
+  className,
 }: {
   conversations: DemoConversation[];
   selectedChatId?: string;
   onSelectChat: (id: string) => void;
   activeMenu?: "chats" | "board" | "settings";
+  className?: string;
 }) {
   const [search, setSearch] = useState("");
 
@@ -49,7 +51,7 @@ export function DemoChatSidebar({
   }, [conversations, search]);
 
   return (
-    <div className="w-80 border-r bg-muted/30 flex flex-col h-full backdrop-blur-xl">
+    <div className={cn("w-full md:w-80 border-r bg-muted/30 flex flex-col h-full backdrop-blur-xl", className)}>
       <div className="p-4 border-b bg-background/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-xl tracking-tight text-foreground">Сообщения</h2>
@@ -133,12 +135,12 @@ export function DemoChatSidebar({
         ))}
       </div>
 
-      <div className="p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
+      <div className="p-3 sm:p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
         <div className="grid grid-cols-3 gap-2">
           <Link
             href="/demo/board"
             className={cn(
-              "flex items-center justify-center gap-2 text-xs font-medium transition-all p-2.5 rounded-xl border",
+              "flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium transition-all p-2 rounded-xl border",
               activeMenu === "board"
                 ? "text-primary bg-background shadow-sm border-border/50"
                 : "text-muted-foreground hover:text-primary hover:bg-background hover:shadow-sm border-transparent hover:border-border/50",
@@ -147,12 +149,12 @@ export function DemoChatSidebar({
             <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
               <Search className="w-3.5 h-3.5" />
             </span>
-            Sellio
+            <span className="hidden sm:inline">Sellio</span>
           </Link>
           <Link
             href="/demo/settings"
             className={cn(
-              "flex items-center justify-center gap-2 text-xs font-medium transition-all p-2.5 rounded-xl border",
+              "flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium transition-all p-2 rounded-xl border",
               activeMenu === "settings"
                 ? "text-primary bg-background shadow-sm border-border/50"
                 : "text-muted-foreground hover:text-primary hover:bg-background hover:shadow-sm border-transparent hover:border-border/50",
@@ -161,12 +163,12 @@ export function DemoChatSidebar({
             <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
               <User className="w-3.5 h-3.5" />
             </span>
-            Настройки
+            <span className="hidden sm:inline">Настройки</span>
           </Link>
           <Link
             href="/demo"
             className={cn(
-              "flex items-center justify-center gap-2 text-xs font-medium transition-all p-2.5 rounded-xl border",
+              "flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium transition-all p-2 rounded-xl border",
               activeMenu === "chats"
                 ? "text-primary bg-background shadow-sm border-border/50"
                 : "text-muted-foreground hover:text-primary hover:bg-background hover:shadow-sm border-transparent hover:border-border/50",
@@ -175,11 +177,10 @@ export function DemoChatSidebar({
             <span className="w-6 h-6 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
               <Shield className="w-3.5 h-3.5" />
             </span>
-            Demo
+            <span className="hidden sm:inline">Demo</span>
           </Link>
         </div>
       </div>
     </div>
   );
 }
-

@@ -82,7 +82,7 @@ export default function AdminPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-50 p-8">
+            <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto max-w-3xl space-y-6">
                     <Card className="border-red-200 bg-red-50">
                         <CardHeader>
@@ -116,19 +116,19 @@ export default function AdminPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-8">
+            <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-6xl space-y-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start sm:items-center gap-3 sm:gap-4">
                         <Link href="/dashboard" className="rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-200">
                             <ArrowLeft className="h-5 w-5" />
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">Админка</h1>
-                            <p className="text-slate-500">Управление пользователями и доступами</p>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Админка</h1>
+                            <p className="text-sm sm:text-base text-slate-500">Управление пользователями и доступами</p>
                         </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <Button onClick={refresh} variant="outline" size="sm" className="gap-2 bg-white" disabled={loading}>
                             <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
                             Обновить
@@ -247,7 +247,7 @@ export default function AdminPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="flex justify-end gap-2">
+                                                    <div className="flex flex-wrap justify-end gap-2">
                                                         <Button size="sm" variant="outline" onClick={() => handleSub(user.id, "trial")}>
                                                             Trial 14д
                                                         </Button>

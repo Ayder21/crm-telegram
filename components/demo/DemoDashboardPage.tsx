@@ -5,6 +5,7 @@ import { DemoChatSidebar } from "@/components/demo/DemoChatSidebar";
 import { DemoChatWindow } from "@/components/demo/DemoChatWindow";
 import { DemoFloatingWidget } from "@/components/demo/DemoFloatingWidget";
 import { demoConversations } from "@/components/demo/data";
+import { cn } from "@/lib/utils";
 
 export function DemoDashboardPage() {
   const conversations = useMemo(
@@ -15,13 +16,18 @@ export function DemoDashboardPage() {
   const selected = conversations.find((c) => c.id === selectedChatId) ?? null;
 
   return (
-    <div className="flex h-screen w-full bg-background">
-      <DemoChatSidebar conversations={conversations} onSelectChat={setSelectedChatId} selectedChatId={selectedChatId || undefined} activeMenu="chats" />
-      <main className="flex-1 flex flex-col h-full">
-        <DemoChatWindow conversation={selected} />
+    <div className="flex h-dvh w-full bg-background">
+      <DemoChatSidebar
+        conversations={conversations}
+        onSelectChat={setSelectedChatId}
+        selectedChatId={selectedChatId || undefined}
+        activeMenu="chats"
+        className={cn(selectedChatId ? "hidden md:flex" : "flex")}
+      />
+      <main className={cn("flex-1 flex flex-col h-full", !selectedChatId ? "hidden md:flex" : "flex")}>
+        <DemoChatWindow conversation={selected} onBack={() => setSelectedChatId(null)} />
       </main>
       <DemoFloatingWidget />
     </div>
   );
 }
-

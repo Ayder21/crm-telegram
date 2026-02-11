@@ -57,16 +57,16 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-8">
-            <div className="max-w-5xl mx-auto space-y-8">
+        <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+            <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
 
-                <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
                     <Link href="/dashboard" className="p-2 rounded-full hover:bg-slate-200 transition-colors text-slate-600">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Настройки</h1>
-                        <p className="text-slate-500">Управление интеграциями и поведением ИИ</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Настройки</h1>
+                        <p className="text-sm sm:text-base text-slate-500">Управление интеграциями и поведением ИИ</p>
                     </div>
                 </div>
 

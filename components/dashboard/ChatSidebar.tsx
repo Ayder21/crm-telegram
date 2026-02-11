@@ -44,10 +44,12 @@ function getLastActivityAt(conversation: ConversationRow): string | null {
 
 export function ChatSidebar({
   onSelectChat,
-  selectedChatId
+  selectedChatId,
+  className
 }: {
   onSelectChat: (id: string) => void,
-  selectedChatId?: string
+  selectedChatId?: string,
+  className?: string
 }) {
   const [conversations, setConversations] = useState<ConversationRow[]>([])
   const [search, setSearch] = useState("")
@@ -117,7 +119,7 @@ export function ChatSidebar({
   )
 
   return (
-    <div className="w-80 border-r bg-muted/30 flex flex-col h-full backdrop-blur-xl">
+    <div className={cn("w-full md:w-80 border-r bg-muted/30 flex flex-col h-full backdrop-blur-xl", className)}>
       {/* Header */}
       <div className="p-4 border-b bg-background/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center justify-between mb-4">
@@ -230,25 +232,25 @@ export function ChatSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
+      <div className="p-3 sm:p-4 border-t bg-background/50 backdrop-blur-sm space-y-2">
         <div className="grid grid-cols-3 gap-2">
-          <a href="/dashboard/board" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+          <a href="/dashboard/board" className="flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
               <Search className="w-3.5 h-3.5" />
             </span>
-            Sellio
+            <span className="hidden sm:inline">Sellio</span>
           </a>
-          <a href="/dashboard/settings" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+          <a href="/dashboard/settings" className="flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
               <User className="w-3.5 h-3.5" />
             </span>
-            Настройки
+            <span className="hidden sm:inline">Настройки</span>
           </a>
-          <a href="/dashboard/admin" className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2.5 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
+          <a href="/dashboard/admin" className="flex items-center justify-center gap-1 sm:gap-2 text-[11px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-all p-2 rounded-xl hover:bg-background hover:shadow-sm border border-transparent hover:border-border/50">
             <span className="w-6 h-6 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
               <Shield className="w-3.5 h-3.5" />
             </span>
-            Admin
+            <span className="hidden sm:inline">Admin</span>
           </a>
         </div>
       </div>
