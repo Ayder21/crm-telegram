@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+    const host = request.headers.get("host") || "";
+    if (host.startsWith("demo.sellio.uz") && request.nextUrl.pathname === "/") {
+        const demoUrl = request.nextUrl.clone();
+        demoUrl.pathname = "/demo";
+        return NextResponse.rewrite(demoUrl);
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
