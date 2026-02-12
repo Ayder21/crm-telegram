@@ -31,6 +31,14 @@ function statusLabel(status: DemoConversation["status"]): string {
   return "Новый";
 }
 
+function normalizePreview(content: string): string {
+  return content
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function DemoChatSidebar({
   conversations,
   selectedChatId,
@@ -128,7 +136,11 @@ export function DemoChatSidebar({
               )}
 
               <div className="text-xs text-muted-foreground truncate leading-relaxed">
-                <span className="text-foreground/80">{conv.messages[conv.messages.length - 1]?.content || "Нет сообщений"}</span>
+                <span className="text-foreground/80">
+                  {conv.messages[conv.messages.length - 1]?.content
+                    ? normalizePreview(conv.messages[conv.messages.length - 1].content)
+                    : "Нет сообщений"}
+                </span>
               </div>
             </div>
           </button>

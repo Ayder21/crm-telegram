@@ -42,6 +42,14 @@ function getLastActivityAt(conversation: ConversationRow): string | null {
   return conversation.lastMessage?.created_at || conversation.last_message_at
 }
 
+function normalizePreview(content: string): string {
+  return content
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function ChatSidebar({
   onSelectChat,
   selectedChatId,
@@ -215,7 +223,7 @@ export function ChatSidebar({
 
               <div className="text-xs text-muted-foreground truncate leading-relaxed">
                 {conv.lastMessage?.content ? (
-                  <span className="text-foreground/80">{conv.lastMessage.content}</span>
+                  <span className="text-foreground/80">{normalizePreview(conv.lastMessage.content)}</span>
                 ) : (
                   <span className="italic opacity-70">Нет сообщений</span>
                 )}

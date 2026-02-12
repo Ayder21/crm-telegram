@@ -19,6 +19,14 @@ type ChatInfo = {
   integrations: { platform: "tg_business" | "instagram" | string } | null
 }
 
+function normalizeMessageContent(content: string): string {
+  return content
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function ChatWindow({ conversationId, onBack }: { conversationId: string, onBack?: () => void }) {
   const [messages, setMessages] = useState<MessageRow[]>([])
   const [inputText, setInputText] = useState("")
@@ -155,7 +163,7 @@ export function ChatWindow({ conversationId, onBack }: { conversationId: string,
                   ? "bg-primary text-primary-foreground rounded-br-sm hover:brightness-110"
                   : "bg-white dark:bg-zinc-800 text-foreground border border-border/50 rounded-bl-sm"
               )}>
-                {msg.content}
+                {normalizeMessageContent(msg.content)}
                 <span className={cn(
                   "text-[10px] absolute bottom-1 opacity-0 group-hover:opacity-70 transition-opacity whitespace-nowrap",
                   isMe ? "right-full mr-3 text-muted-foreground" : "left-full ml-3 text-muted-foreground"

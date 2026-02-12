@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Send, MoreVertical, Phone, Video, Paperclip, Smile, ArrowLeft } from "lucide-react";
 import type { DemoConversation } from "@/components/demo/data";
 
+function normalizeMessageContent(content: string): string {
+  return content
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function DemoChatWindow({ conversation, onBack }: { conversation: DemoConversation | null; onBack?: () => void }) {
   const [inputText, setInputText] = useState("");
 
@@ -68,7 +76,7 @@ export function DemoChatWindow({ conversation, onBack }: { conversation: DemoCon
                     : "bg-white dark:bg-zinc-800 text-foreground border border-border/50 rounded-bl-sm",
                 )}
               >
-                {msg.content}
+                {normalizeMessageContent(msg.content)}
                 <span
                   className={cn(
                     "text-[10px] absolute bottom-1 opacity-0 group-hover:opacity-70 transition-opacity whitespace-nowrap",
