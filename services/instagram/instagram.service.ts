@@ -1,4 +1,3 @@
-import { IgApiClient } from 'instagram-private-api';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateAIResponse } from '@/services/openai.service';
 import { updateLeadProfileFromMessage } from '@/services/crm/lead-profile.service';
@@ -10,215 +9,190 @@ type ContextMessage = {
   content: string;
 };
 
+const RELAY_URL = process.env.IG_RELAY_URL || 'http://84.247.137.21:3005';
+const RELAY_API_KEY = process.env.IG_RELAY_API_KEY || 'sellio-secret-relay-key-2026';
+
+async function relayPost(path: string, body: Record<string, unknown>) {
+  const res = await fetch(`${RELAY_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': RELAY_API_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Relay ${path} failed (${res.status}): ${errText}`);
+  }
+
+  return res.json();
+}
+
 export class InstagramService {
-  private ig: IgApiClient;
   private integrationId: string;
   private userId: string;
-  private myUserId: number | null = null;
+
+  // Auth data passed to relay
+  private username: string = '';
+  private sessionid: string | null = null;
+  private cookiesJson: unknown[] | null = null;
+  private sessionData: InstagramSessionData = null;
 
   constructor(integrationId: string, userId: string) {
-    this.ig = new IgApiClient();
     this.integrationId = integrationId;
     this.userId = userId;
   }
 
-  // Инициализация клиента
   async initialize(username: string, passwordOrSessionId?: string, sessionData?: InstagramSessionData) {
-    this.ig.state.generateDevice(username);
+    this.username = username;
 
-    if (sessionData) {
-      await this.ig.state.deserialize(sessionData);
-      if (this.ig.state.cookieUserId) {
-        this.myUserId = parseInt(this.ig.state.cookieUserId);
-      }
+    if (sessionData && typeof sessionData === 'object' && Object.keys(sessionData).length > 0) {
+      this.sessionData = sessionData;
+      console.log(`[IG] Using existing session data for ${username}`);
+      return;
     }
 
-    if (passwordOrSessionId && (!sessionData || Object.keys(sessionData).length === 0)) {
-      console.log("Initializing Instagram via Session ID or Cookies...");
-
+    if (passwordOrSessionId) {
+      // Detect JSON cookie array
       try {
-        let extractedPk: string | undefined;
-
-        let parsedJsonCookies = null;
-        try {
-          const parsed = JSON.parse(passwordOrSessionId);
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name !== undefined) {
-            parsedJsonCookies = parsed;
-          }
-        } catch (e) {
-          // Not JSON
+        const parsed = JSON.parse(passwordOrSessionId);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name !== undefined) {
+          this.cookiesJson = parsed;
+          console.log(`[IG] JSON cookies detected for ${username}`);
+          return;
         }
-
-        if (parsedJsonCookies) {
-          console.log("JSON Cookie array detected. Parsing and injecting...");
-          for (const c of parsedJsonCookies) {
-            if (c.name === 'sessionid') {
-              let val = c.value;
-              if (val.includes('%3A')) val = decodeURIComponent(val);
-              extractedPk = val.split(':')[0];
-            }
-            if (c.name === 'ds_user_id') {
-              extractedPk = c.value;
-            }
-            await this.ig.state.cookieJar.setCookie(`${c.name}=${c.value}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-          }
-        } else if (passwordOrSessionId.includes('sessionid=')) {
-          console.log("Full Cookie string detected. Parsing and injecting...");
-          const cookies = passwordOrSessionId.split(';').map(c => c.trim()).filter(c => c);
-          for (const cookie of cookies) {
-            if (cookie.startsWith('sessionid=')) {
-              let val = cookie.split('=')[1];
-              if (val.includes('%3A')) val = decodeURIComponent(val);
-              extractedPk = val.split(':')[0];
-            }
-            if (cookie.startsWith('ds_user_id=')) {
-              extractedPk = cookie.split('=')[1];
-            }
-            // Inject each cookie exactly as provided
-            await this.ig.state.cookieJar.setCookie(`${cookie}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-          }
-        } else {
-          console.log("Single Session ID detected. Injecting stealth cookies...");
-          let decodedSessionId = passwordOrSessionId;
-          if (decodedSessionId.includes('%3A')) {
-            decodedSessionId = decodeURIComponent(decodedSessionId);
-          }
-          extractedPk = decodedSessionId.split(':')[0];
-
-          const cookieString = `sessionid=${passwordOrSessionId}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-          await this.ig.state.cookieJar.setCookie(cookieString, 'https://instagram.com');
-
-          if (extractedPk && !isNaN(parseInt(extractedPk))) {
-            const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-            await this.ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
-          }
-
-          const csrfCookie = `csrftoken=missing; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-          await this.ig.state.cookieJar.setCookie(csrfCookie, 'https://instagram.com');
-
-          const igDidCookie = `ig_did=${this.ig.state.deviceString}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-          await this.ig.state.cookieJar.setCookie(igDidCookie, 'https://instagram.com');
-
-          const midCookie = `mid=xyz; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-          await this.ig.state.cookieJar.setCookie(midCookie, 'https://instagram.com');
-        }
-
-        if (extractedPk && !isNaN(parseInt(extractedPk))) {
-          this.myUserId = parseInt(extractedPk);
-          console.log(`Stealth Login via Cookie! User ID: ${this.myUserId}`);
-          await this.saveSession();
-        } else {
-          throw new Error("Could not extract User ID from sessionid");
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "unknown_error";
-        console.error("Cookie Login Failed:", message);
-        throw new Error("Invalid Session ID format");
+      } catch {
+        // not JSON
       }
+
+      // Detect full cookie string (has semicolons)
+      if (passwordOrSessionId.includes('sessionid=') || passwordOrSessionId.includes(';')) {
+        this.sessionid = passwordOrSessionId;
+        console.log(`[IG] Full cookie string detected for ${username}`);
+        return;
+      }
+
+      // Fallback: treat as raw sessionid
+      this.sessionid = passwordOrSessionId;
+      console.log(`[IG] Raw session ID detected for ${username}`);
     }
   }
 
-  private async saveSession() {
-    const serialized = await this.ig.state.serialize();
-    delete serialized.constants;
+  private getAuthPayload() {
+    return {
+      username: this.username,
+      sessionData: this.sessionData || undefined,
+      sessionid: this.sessionid || undefined,
+      cookiesJson: this.cookiesJson || undefined,
+    };
+  }
 
+  private async saveSession(updatedSessionData: InstagramSessionData) {
+    if (!updatedSessionData) return;
     await supabaseAdmin
       .from('integrations')
-      .update({ session_data: serialized, updated_at: new Date().toISOString() })
+      .update({ session_data: updatedSessionData, updated_at: new Date().toISOString() })
       .eq('id', this.integrationId);
   }
 
   async checkNewMessages(systemPrompt: string, aiEnabled: boolean = true, knowledgeBaseUrl?: string) {
-    if (!this.myUserId) {
-      try {
-        const currentUser = await this.ig.account.currentUser();
-        this.myUserId = currentUser.pk;
-      } catch (e) {
-        console.error("Failed to get current user PK, skipping check.");
-        return;
-      }
+    console.log(`[IG] Checking messages via VPS relay for ${this.integrationId}...`);
+
+    const result = await relayPost('/api/ig/check_messages', this.getAuthPayload());
+
+    // Update local session cache + persist to DB
+    if (result.updatedSessionData) {
+      this.sessionData = result.updatedSessionData;
+      await this.saveSession(result.updatedSessionData);
     }
 
-    console.log(`[IG] Checking messages for ${this.integrationId}...`);
+    const threads: unknown[] = result.threads || [];
+    const myUserIdStr: string | undefined = result.myUserId;
 
-    try {
-      const inboxFeed = this.ig.feed.directInbox();
-      const threads = await inboxFeed.items();
+    for (const thread of threads as Record<string, unknown>[]) {
+      const items = (thread.items as Record<string, unknown>[]) || [];
+      const lastItem = items[0];
+      if (!lastItem || lastItem.item_type !== 'text') continue;
 
-      for (const thread of threads) {
-        const lastItem = thread.items[0];
-        if (!lastItem || lastItem.item_type !== 'text') continue;
+      // Skip messages sent by ourselves
+      if (myUserIdStr && String(lastItem.user_id) === String(myUserIdStr)) continue;
 
-        if (lastItem.user_id === this.myUserId) continue;
+      const externalChatId = thread.thread_id as string;
+      const messageId = lastItem.item_id as string;
+      const users = (thread.users as Record<string, unknown>[]) || [];
+      const senderUser = users.find(u => String(u.pk) === String(lastItem.user_id));
+      const senderName = (senderUser?.username as string) || 'Unknown';
+      const content = lastItem.text as string;
+      if (!content) continue;
 
-        const externalChatId = thread.thread_id;
-        const messageId = lastItem.item_id;
-        const senderName = thread.users.find(u => u.pk === lastItem.user_id)?.username || "Unknown";
-        const content = lastItem.text;
-        if (!content) continue;
+      const conversationId = await this.getOrCreateConversation(externalChatId, senderName);
 
-        const conversationId = await this.getOrCreateConversation(externalChatId, senderName);
+      const { data: lastMsg } = await supabaseAdmin
+        .from('messages')
+        .select('metadata')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-        const { data: lastMsg } = await supabaseAdmin
+      const lastSavedId = (lastMsg?.metadata as Record<string, unknown>)?.message_id;
+      if (lastSavedId === messageId) continue;
+
+      console.log(`[IG] New message from ${senderName}: ${content}`);
+
+      await supabaseAdmin.from('messages').insert({
+        conversation_id: conversationId,
+        sender: 'customer',
+        content: content,
+        metadata: { message_id: messageId }
+      });
+      await updateLeadProfileFromMessage(conversationId, content, { username: senderName });
+
+      if (aiEnabled) {
+        const { data: history } = await supabaseAdmin
           .from('messages')
-          .select('metadata')
+          .select('sender, content')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(10);
 
-        const lastSavedId = lastMsg?.metadata?.message_id;
+        const contextMessages = (history || []).reverse().map((m: ContextMessage) => ({
+          role: m.sender === 'customer' ? 'user' as const : 'assistant' as const,
+          content: m.content
+        }));
 
-        if (lastSavedId === messageId) continue;
+        console.log(`[IG] Generating AI response for ${senderName}...`);
+        const aiResponse = await generateAIResponse(systemPrompt, contextMessages, knowledgeBaseUrl);
 
-        console.log(`[IG] New message from ${senderName}: ${content}`);
+        console.log(`[IG] Sending reply: "${aiResponse}"`);
+        await this.sendDirectMessage(externalChatId, aiResponse);
 
         await supabaseAdmin.from('messages').insert({
           conversation_id: conversationId,
-          sender: 'customer',
-          content: content,
-          metadata: { message_id: messageId }
+          sender: 'assistant',
+          content: aiResponse
         });
-        await updateLeadProfileFromMessage(conversationId, content, { username: senderName });
-
-        // AI Logic
-        if (aiEnabled) {
-          const { data: history } = await supabaseAdmin
-            .from('messages')
-            .select('sender, content')
-            .eq('conversation_id', conversationId)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-          const contextMessages = (history || []).reverse().map((m: ContextMessage) => ({
-            role: m.sender === 'customer' ? 'user' as const : 'assistant' as const,
-            content: m.content
-          }));
-
-          console.log(`[IG] Generating AI response for ${senderName}...`);
-          const aiResponse = await generateAIResponse(systemPrompt, contextMessages, knowledgeBaseUrl);
-
-          console.log(`[IG] Sending reply: "${aiResponse}"`);
-          await this.ig.entity.directThread(thread.thread_id).broadcastText(aiResponse);
-
-          await supabaseAdmin.from('messages').insert({
-            conversation_id: conversationId,
-            sender: 'assistant',
-            content: aiResponse
-          });
-          await updateLeadProfileFromMessage(conversationId, aiResponse);
-        } else {
-          console.log("[IG] AI Disabled, skipping reply.");
-        }
+        await updateLeadProfileFromMessage(conversationId, aiResponse);
+      } else {
+        console.log('[IG] AI Disabled, skipping reply.');
       }
-    } catch (error: unknown) {
-      console.error("[IG] Error checking messages:", error);
-      throw error;
     }
   }
 
   async sendDirectMessage(threadId: string, content: string) {
-    await this.ig.entity.directThread(threadId).broadcastText(content);
+    const result = await relayPost('/api/ig/send_message', {
+      ...this.getAuthPayload(),
+      threadId,
+      text: content,
+    });
+
+    // Persist updated session after sending
+    if (result.updatedSessionData) {
+      this.sessionData = result.updatedSessionData;
+      await this.saveSession(result.updatedSessionData);
+    }
   }
 
   private async getOrCreateConversation(externalChatId: string, customerName: string) {
