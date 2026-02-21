@@ -13,30 +13,31 @@ export async function POST(req: NextRequest) {
 
     // Проверяем существование
     const { data: existing } = await supabaseAdmin
-        .from('integrations')
-        .select('id')
-        .eq('user_id', user_id)
-        .eq('platform', 'instagram')
-        .maybeSingle();
+      .from('integrations')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('platform', 'instagram')
+      .maybeSingle();
 
     if (existing) {
-        const { error } = await supabaseAdmin.from('integrations').update({
-            credentials_encrypted: encrypted,
-            is_active: true, // <-- УБЕЖДАЕМСЯ ЧТО АКТИВНА
-            updated_at: new Date().toISOString()
-        }).eq('id', existing.id);
-        
-        if (error) throw error;
+      const { error } = await supabaseAdmin.from('integrations').update({
+        credentials_encrypted: encrypted,
+        session_data: null, // Clear old session data so it uses the new sessionid
+        is_active: true, // <-- УБЕЖДАЕМСЯ ЧТО АКТИВНА
+        updated_at: new Date().toISOString()
+      }).eq('id', existing.id);
+
+      if (error) throw error;
     } else {
-        const { error } = await supabaseAdmin.from('integrations').insert({
-            user_id: user_id,
-            platform: 'instagram',
-            credentials_encrypted: encrypted,
-            is_active: true,
-            system_prompt: 'You are a helpful assistant.'
-        });
-        
-        if (error) throw error;
+      const { error } = await supabaseAdmin.from('integrations').insert({
+        user_id: user_id,
+        platform: 'instagram',
+        credentials_encrypted: encrypted,
+        is_active: true,
+        system_prompt: 'You are a helpful assistant.'
+      });
+
+      if (error) throw error;
     }
 
     return NextResponse.json({ success: true });
