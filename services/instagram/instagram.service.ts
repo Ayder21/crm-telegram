@@ -39,8 +39,30 @@ export class InstagramService {
       try {
         let extractedPk: string | undefined;
 
-        // Check if it's a full cookie string (contains 'sessionid=') or just the sessionid value
-        if (passwordOrSessionId.includes('sessionid=')) {
+        let parsedJsonCookies = null;
+        try {
+          const parsed = JSON.parse(passwordOrSessionId);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name !== undefined) {
+            parsedJsonCookies = parsed;
+          }
+        } catch (e) {
+          // Not JSON
+        }
+
+        if (parsedJsonCookies) {
+          console.log("JSON Cookie array detected. Parsing and injecting...");
+          for (const c of parsedJsonCookies) {
+            if (c.name === 'sessionid') {
+              let val = c.value;
+              if (val.includes('%3A')) val = decodeURIComponent(val);
+              extractedPk = val.split(':')[0];
+            }
+            if (c.name === 'ds_user_id') {
+              extractedPk = c.value;
+            }
+            await this.ig.state.cookieJar.setCookie(`${c.name}=${c.value}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
+          }
+        } else if (passwordOrSessionId.includes('sessionid=')) {
           console.log("Full Cookie string detected. Parsing and injecting...");
           const cookies = passwordOrSessionId.split(';').map(c => c.trim()).filter(c => c);
           for (const cookie of cookies) {
