@@ -26,9 +26,10 @@ app.post('/api/ig/login', authenticate, async (req, res) => {
         const ig = new IgApiClient();
         ig.state.generateDevice(username);
 
-        await ig.simulate.preLoginFlow();
+        // Skip preLoginFlow / postLoginFlow — they send many extra requests
+        // (attribution, ads, etc.) that trigger Instagram rate-limits on datacenter IPs.
+        console.log(`[login] Attempting login for ${username}...`);
         const loggedInUser = await ig.account.login(username, password);
-        await ig.simulate.postLoginFlow();
 
         const serialized = await ig.state.serialize();
         delete serialized.constants;
@@ -37,7 +38,12 @@ app.post('/api/ig/login', authenticate, async (req, res) => {
         res.json({ success: true, sessionData: serialized, pk: loggedInUser.pk });
     } catch (e) {
         console.error('[login] Error:', e.message);
-        res.status(500).json({ success: false, error: e.message });
+        // Provide a clear message to help the user understand the issue
+        let msg = e.message;
+        if (msg.includes('401')) msg = 'Instagram заблокировал попытку входа с нашего сервера. Подождите 5-10 минут и попробуйте снова.';
+        if (msg.includes('400')) msg = 'Неверный логин или пароль.';
+        if (msg.includes('challenge_required')) msg = 'Instagram требует подтверждения (2FA). Пожалуйста, зайдите в аккаунт через браузер и подтвердите, затем попробуйте снова.';
+        res.status(500).json({ success: false, error: msg });
     }
 });
 
