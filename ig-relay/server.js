@@ -7,46 +7,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// A simple API Key check to ensure random internet access isn't allowed
 const API_KEY = process.env.RELAY_API_KEY || 'sellio-secret-relay-key-2026';
 
 function authenticate(req, res, next) {
     const key = req.headers['x-api-key'];
-    if (key !== API_KEY) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (key !== API_KEY) return res.status(401).json({ error: 'Unauthorized' });
     next();
 }
 
-async function getIgClient(username, sessionData, sessionid, cookiesJson) {
-    const ig = new IgApiClient();
-    ig.state.generateDevice(username || 'proxy_device');
-
-    if (sessionData) {
-        await ig.state.deserialize(sessionData);
-    } else if (cookiesJson && Array.isArray(cookiesJson)) {
-        for (const c of cookiesJson) {
-            await ig.state.cookieJar.setCookie(`${c.name}=${c.value}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-        }
-    } else if (sessionid) {
-        let extractedPk = sessionid.split(':')[0];
-        if (extractedPk && !isNaN(parseInt(extractedPk))) {
-            const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-            await ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
-        }
-        await ig.state.cookieJar.setCookie(`sessionid=${sessionid}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-        await ig.state.cookieJar.setCookie(`csrftoken=missing; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-        await ig.state.cookieJar.setCookie(`ig_did=${ig.state.deviceString}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-        await ig.state.cookieJar.setCookie(`mid=xyz; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
-    }
-
-    return ig;
-}
-
+// ── LOGIN (Generates a fresh VPS-bound session) ────────────────────────────────
+// Call this once per user from the CRM settings page.
+// The returned sessionData must be stored in Supabase and sent on every subsequent call.
 app.post('/api/ig/login', authenticate, async (req, res) => {
     try {
         const { username, password } = req.body;
-        if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+        if (!username || !password) return res.status(400).json({ error: 'Missing username or password' });
 
         const ig = new IgApiClient();
         ig.state.generateDevice(username);
@@ -58,59 +33,66 @@ app.post('/api/ig/login', authenticate, async (req, res) => {
         const serialized = await ig.state.serialize();
         delete serialized.constants;
 
-        res.json({ success: true, sessionData: serialized, user: loggedInUser });
+        console.log(`[login] OK for ${username} (pk=${loggedInUser.pk})`);
+        res.json({ success: true, sessionData: serialized, pk: loggedInUser.pk });
     } catch (e) {
-        console.error("Login Error:", e);
+        console.error('[login] Error:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });
 
+// ── CHECK MESSAGES ─────────────────────────────────────────────────────────────
 app.post('/api/ig/check_messages', authenticate, async (req, res) => {
     try {
-        const { username, sessionData, sessionid, cookiesJson } = req.body;
-        if (!sessionData && !cookiesJson && !sessionid) return res.status(400).json({ error: 'Missing sessionData or cookies' });
+        const { username, sessionData } = req.body;
+        if (!sessionData) return res.status(400).json({ error: 'Missing sessionData. Call /api/ig/login first.' });
 
-        const ig = await getIgClient(username, sessionData, sessionid, cookiesJson);
+        const ig = new IgApiClient();
+        ig.state.generateDevice(username || 'device');
+        await ig.state.deserialize(sessionData);
+
+        const myUserId = ig.state.cookieUserId;
 
         const inboxFeed = ig.feed.directInbox();
         const threads = await inboxFeed.items();
 
-        // Save potentially updated state
-        const serialized = await ig.state.serialize();
-        delete serialized.constants;
+        const updated = await ig.state.serialize();
+        delete updated.constants;
 
-        res.json({ success: true, threads, updatedSessionData: serialized });
+        console.log(`[check_messages] OK for ${username}, ${threads.length} threads`);
+        res.json({ success: true, threads, myUserId, updatedSessionData: updated });
     } catch (e) {
-        console.error("Inbox Error:", e);
+        console.error('[check_messages] Error:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });
 
+// ── SEND MESSAGE ───────────────────────────────────────────────────────────────
 app.post('/api/ig/send_message', authenticate, async (req, res) => {
     try {
-        const { username, sessionData, sessionid, cookiesJson, threadId, text } = req.body;
-        if (!threadId || !text) {
-            return res.status(400).json({ success: false, error: 'Missing threadId or text' });
-        }
-        if (!sessionData && !sessionid && !cookiesJson) {
-            return res.status(400).json({ success: false, error: 'Missing auth data' });
-        }
+        const { username, sessionData, threadId, text } = req.body;
+        if (!sessionData) return res.status(400).json({ error: 'Missing sessionData. Call /api/ig/login first.' });
+        if (!threadId || !text) return res.status(400).json({ error: 'Missing threadId or text' });
 
-        const ig = await getIgClient(username, sessionData, sessionid, cookiesJson);
+        const ig = new IgApiClient();
+        ig.state.generateDevice(username || 'device');
+        await ig.state.deserialize(sessionData);
 
         await ig.entity.directThread(threadId).broadcastText(text);
 
-        const serialized = await ig.state.serialize();
-        delete serialized.constants;
+        const updated = await ig.state.serialize();
+        delete updated.constants;
 
-        res.json({ success: true, updatedSessionData: serialized });
+        console.log(`[send_message] OK to thread ${threadId}`);
+        res.json({ success: true, updatedSessionData: updated });
     } catch (e) {
-        console.error("Send Error:", e);
+        console.error('[send_message] Error:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });
 
-const PORT = 3005;
-app.listen(PORT, () => {
-    console.log(`Instagram Private API Relay running on port ${PORT}`);
-});
+// ── HEALTH ─────────────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok', ts: Date.now() }));
+
+const PORT = process.env.PORT || 3005;
+app.listen(PORT, () => console.log(`ig-relay running on port ${PORT}`));
