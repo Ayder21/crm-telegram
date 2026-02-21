@@ -39,17 +39,32 @@ export class InstagramService {
       const cookieString = `sessionid=${passwordOrSessionId}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
       await this.ig.state.cookieJar.setCookie(cookieString, 'https://instagram.com');
 
-      console.log("Session ID injected. Verifying user...");
+      console.log("Session ID injected. Setting User ID stealthily...");
 
       try {
-        const currentUser = await this.ig.account.currentUser();
-        this.myUserId = currentUser.pk;
-        console.log(`Logged in as ${currentUser.username} (PK: ${this.myUserId}) via Cookie!`);
-        await this.saveSession();
+        // The sessionid format is usually: {userId}%3A{token} or {userId}:{token}
+        let decodedSessionId = passwordOrSessionId;
+        if (decodedSessionId.includes('%3A')) {
+          decodedSessionId = decodeURIComponent(decodedSessionId);
+        }
+
+        const extractedPk = decodedSessionId.split(':')[0];
+        if (extractedPk && !isNaN(parseInt(extractedPk))) {
+          this.myUserId = parseInt(extractedPk);
+
+          // Inject ds_user_id cookie to satisfy internal library getters securely
+          const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+          await this.ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
+
+          console.log(`Stealth Login via Cookie! User ID: ${this.myUserId}`);
+          await this.saveSession();
+        } else {
+          throw new Error("Could not extract User ID from sessionid");
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "unknown_error";
         console.error("Cookie Login Failed:", message);
-        throw new Error("Invalid Session ID or IP Blocked");
+        throw new Error("Invalid Session ID format");
       }
     }
   }
