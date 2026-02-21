@@ -56,6 +56,15 @@ export class InstagramService {
           const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
           await this.ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
 
+          const csrfCookie = `csrftoken=missing; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+          await this.ig.state.cookieJar.setCookie(csrfCookie, 'https://instagram.com');
+
+          const igDidCookie = `ig_did=${this.ig.state.deviceString}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+          await this.ig.state.cookieJar.setCookie(igDidCookie, 'https://instagram.com');
+
+          const midCookie = `mid=xyz; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+          await this.ig.state.cookieJar.setCookie(midCookie, 'https://instagram.com');
+
           console.log(`Stealth Login via Cookie! User ID: ${this.myUserId}`);
           await this.saveSession();
         } else {
