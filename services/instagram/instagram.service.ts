@@ -34,27 +34,42 @@ export class InstagramService {
     }
 
     if (passwordOrSessionId && (!sessionData || Object.keys(sessionData).length === 0)) {
-      console.log("Initializing Instagram via Session ID...");
-
-      const cookieString = `sessionid=${passwordOrSessionId}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-      await this.ig.state.cookieJar.setCookie(cookieString, 'https://instagram.com');
-
-      console.log("Session ID injected. Setting User ID stealthily...");
+      console.log("Initializing Instagram via Session ID or Cookies...");
 
       try {
-        // The sessionid format is usually: {userId}%3A{token} or {userId}:{token}
-        let decodedSessionId = passwordOrSessionId;
-        if (decodedSessionId.includes('%3A')) {
-          decodedSessionId = decodeURIComponent(decodedSessionId);
-        }
+        let extractedPk: string | undefined;
 
-        const extractedPk = decodedSessionId.split(':')[0];
-        if (extractedPk && !isNaN(parseInt(extractedPk))) {
-          this.myUserId = parseInt(extractedPk);
+        // Check if it's a full cookie string (contains 'sessionid=') or just the sessionid value
+        if (passwordOrSessionId.includes('sessionid=')) {
+          console.log("Full Cookie string detected. Parsing and injecting...");
+          const cookies = passwordOrSessionId.split(';').map(c => c.trim()).filter(c => c);
+          for (const cookie of cookies) {
+            if (cookie.startsWith('sessionid=')) {
+              let val = cookie.split('=')[1];
+              if (val.includes('%3A')) val = decodeURIComponent(val);
+              extractedPk = val.split(':')[0];
+            }
+            if (cookie.startsWith('ds_user_id=')) {
+              extractedPk = cookie.split('=')[1];
+            }
+            // Inject each cookie exactly as provided
+            await this.ig.state.cookieJar.setCookie(`${cookie}; Domain=.instagram.com; Path=/; Secure; HttpOnly`, 'https://instagram.com');
+          }
+        } else {
+          console.log("Single Session ID detected. Injecting stealth cookies...");
+          let decodedSessionId = passwordOrSessionId;
+          if (decodedSessionId.includes('%3A')) {
+            decodedSessionId = decodeURIComponent(decodedSessionId);
+          }
+          extractedPk = decodedSessionId.split(':')[0];
 
-          // Inject ds_user_id cookie to satisfy internal library getters securely
-          const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-          await this.ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
+          const cookieString = `sessionid=${passwordOrSessionId}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+          await this.ig.state.cookieJar.setCookie(cookieString, 'https://instagram.com');
+
+          if (extractedPk && !isNaN(parseInt(extractedPk))) {
+            const dsUserIdCookie = `ds_user_id=${extractedPk}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+            await this.ig.state.cookieJar.setCookie(dsUserIdCookie, 'https://instagram.com');
+          }
 
           const csrfCookie = `csrftoken=missing; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
           await this.ig.state.cookieJar.setCookie(csrfCookie, 'https://instagram.com');
@@ -64,7 +79,10 @@ export class InstagramService {
 
           const midCookie = `mid=xyz; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
           await this.ig.state.cookieJar.setCookie(midCookie, 'https://instagram.com');
+        }
 
+        if (extractedPk && !isNaN(parseInt(extractedPk))) {
+          this.myUserId = parseInt(extractedPk);
           console.log(`Stealth Login via Cookie! User ID: ${this.myUserId}`);
           await this.saveSession();
         } else {
