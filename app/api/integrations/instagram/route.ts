@@ -4,26 +4,18 @@ import { encrypt } from '@/lib/crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password: sessionIdOrCookies, user_id } = await req.json();
+    const { username, access_token, user_id } = await req.json();
 
-    if (!username || !sessionIdOrCookies) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    if (!access_token) {
+      return NextResponse.json({ error: 'Missing access_token' }, { status: 400 });
     }
 
-    const credentials = JSON.stringify({ username, password: sessionIdOrCookies });
+    // Store the access token in session_data
+    const sessionObj = { access_token };
+
+    // Also encrypt credentials for legacy compatibility
+    const credentials = JSON.stringify({ username: username || 'instagram', password: access_token });
     const encrypted = encrypt(credentials);
-
-    // Parse cookies into a structured form for session_data
-    let sessionObj: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(sessionIdOrCookies);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name !== undefined) {
-        sessionObj = { cookiesJson: parsed };
-      }
-    } catch {
-      // Not JSON — treat as raw sessionid
-      sessionObj = { sessionid: sessionIdOrCookies };
-    }
 
     const { data: existing } = await supabaseAdmin
       .from('integrations')
