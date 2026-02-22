@@ -38,7 +38,6 @@ export class InstagramService {
   private username: string = '';
   private sessionid: string | null = null;
   private cookiesJson: unknown[] | null = null;
-  private sessionData: InstagramSessionData = null;
 
   constructor(integrationId: string, userId: string) {
     this.integrationId = integrationId;
@@ -48,10 +47,19 @@ export class InstagramService {
   async initialize(username: string, passwordOrSessionId?: string, sessionData?: InstagramSessionData) {
     this.username = username;
 
-    if (sessionData && typeof sessionData === 'object' && Object.keys(sessionData).length > 0) {
-      this.sessionData = sessionData;
-      console.log(`[IG] Using existing session data for ${username}`);
-      return;
+    // sessionData now stores the cookiesJson or raw sessionid (not a library session)
+    if (sessionData && typeof sessionData === 'object') {
+      const sd = sessionData as Record<string, unknown>;
+      if (Array.isArray(sd.cookiesJson)) {
+        this.cookiesJson = sd.cookiesJson as unknown[];
+        console.log(`[IG] Loaded cookiesJson from sessionData for ${username}`);
+        return;
+      }
+      if (sd.sessionid) {
+        this.sessionid = sd.sessionid as string;
+        console.log(`[IG] Loaded sessionid from sessionData for ${username}`);
+        return;
+      }
     }
 
     if (passwordOrSessionId) {
@@ -66,34 +74,28 @@ export class InstagramService {
       } catch {
         // not JSON
       }
-
-      // Detect full cookie string (has semicolons)
-      if (passwordOrSessionId.includes('sessionid=') || passwordOrSessionId.includes(';')) {
-        this.sessionid = passwordOrSessionId;
-        console.log(`[IG] Full cookie string detected for ${username}`);
-        return;
-      }
-
       // Fallback: treat as raw sessionid
       this.sessionid = passwordOrSessionId;
-      console.log(`[IG] Raw session ID detected for ${username}`);
+      console.log(`[IG] Session ID detected for ${username}`);
     }
   }
 
   private getAuthPayload() {
     return {
-      username: this.username,
-      sessionData: this.sessionData || undefined,
-      sessionid: this.sessionid || undefined,
       cookiesJson: this.cookiesJson || undefined,
+      sessionid: this.sessionid || undefined,
     };
   }
 
-  private async saveSession(updatedSessionData: InstagramSessionData) {
-    if (!updatedSessionData) return;
+  private async saveSession() {
+    // Store cookies back into session_data so they persist in Supabase
+    const sessionObj = this.cookiesJson
+      ? { cookiesJson: this.cookiesJson }
+      : { sessionid: this.sessionid };
+
     await supabaseAdmin
       .from('integrations')
-      .update({ session_data: updatedSessionData, updated_at: new Date().toISOString() })
+      .update({ session_data: sessionObj, updated_at: new Date().toISOString() })
       .eq('id', this.integrationId);
   }
 
@@ -102,11 +104,6 @@ export class InstagramService {
 
     const result = await relayPost('/api/ig/check_messages', this.getAuthPayload());
 
-    // Update local session cache + persist to DB
-    if (result.updatedSessionData) {
-      this.sessionData = result.updatedSessionData;
-      await this.saveSession(result.updatedSessionData);
-    }
 
     const threads: unknown[] = result.threads || [];
     const myUserIdStr: string | undefined = result.myUserId;
@@ -190,8 +187,7 @@ export class InstagramService {
 
     // Persist updated session after sending
     if (result.updatedSessionData) {
-      this.sessionData = result.updatedSessionData;
-      await this.saveSession(result.updatedSessionData);
+      await this.saveSession();
     }
   }
 
