@@ -27,8 +27,12 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
+        // RAW DEBUG LOG — prints everything Meta sends
+        console.log('[IG Webhook] RAW BODY:', JSON.stringify(body, null, 2));
+
         // Meta sends a top-level 'object' field
         if (body.object !== 'instagram') {
+            console.log('[IG Webhook] Ignored — object is:', body.object);
             return NextResponse.json({ status: 'ignored' });
         }
 
