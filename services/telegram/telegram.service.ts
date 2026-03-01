@@ -122,7 +122,7 @@ export class TelegramService {
         .delete()
         .eq('conversation_id', conversationId);
 
-      const bizConnectionId = connectionId || integration.session_data?.business_connection_id;
+      const bizConnectionId = connectionId; // Only use explicitly provided connectionId
       await this.sendTelegramMessage(externalChatId, "🧹 История переписки очищена. Я забыл всё, что мы обсуждали.", bizConnectionId);
       return;
     }
