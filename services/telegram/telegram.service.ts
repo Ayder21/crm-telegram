@@ -3,6 +3,7 @@ import { TelegramUpdate, TelegramMessage } from '@/types/telegram';
 import { generateAIResponse } from '@/services/openai.service';
 import { waitingCallChannelService } from '@/services/telegram/waiting-call-channel.service';
 import { updateLeadProfileFromMessage } from '@/services/crm/lead-profile.service';
+import { transcribeAudio } from '@/services/openai.service';
 
 type IntegrationConfig = {
   id: string;
@@ -105,8 +106,36 @@ export class TelegramService {
     }
 
     const externalChatId = message.chat.id.toString();
-    const text = message.text || "";
-    // Игнорируем сообщения без текста (картинки и т.д. пока не поддерживаем)
+    const bizConnectionId = connectionId; // Only use explicitly provided connectionId
+
+    let text = message.text || "";
+
+    // ── ОБРАБОТКА ГОЛОСОВЫХ СООБЩЕНИЙ ──
+    if (!text && (message.voice || message.audio)) {
+      const fileId = message.voice?.file_id || message.audio?.file_id;
+      if (fileId) {
+        console.log(`[Voice] Detected audio message ${fileId}. Transcribing...`);
+        // Пока транскрибируем, покажем "печатает" (или "записывает голосовое", но typing тоже норм)
+        await this.sendTypingAction(externalChatId, bizConnectionId);
+
+        try {
+          const audioBuffer = await this.downloadTelegramFile(fileId, this.botToken);
+          if (audioBuffer) {
+            const transcription = await transcribeAudio(audioBuffer, 'voice_message.ogg');
+            if (transcription && transcription.trim()) {
+              text = `[Голосовое сообщение] ${transcription}`;
+              console.log(`[Voice] Transcribed text: "${text}"`);
+            } else {
+              console.log("[Voice] Transcription returned empty text.");
+            }
+          }
+        } catch (err) {
+          console.error("[Voice] Error processing voice message:", err);
+        }
+      }
+    }
+
+    // Игнорируем сообщения без текста (картинки без подписи, непрочитанные голосовые и т.д.)
     if (!text) return;
 
     // ОБРАБОТКА КОМАНД: /reset или /clear
@@ -119,10 +148,11 @@ export class TelegramService {
 
       await supabaseAdmin
         .from('messages')
+      await supabaseAdmin
+        .from('messages')
         .delete()
         .eq('conversation_id', conversationId);
 
-      const bizConnectionId = connectionId; // Only use explicitly provided connectionId
       await this.sendTelegramMessage(externalChatId, "🧹 История переписки очищена. Я забыл всё, что мы обсуждали.", bizConnectionId);
       return;
     }
@@ -136,7 +166,6 @@ export class TelegramService {
     const isCompleted = ['waiting_call', 'scheduled', 'closed_won', 'closed_lost'].includes(status);
 
     // UX: Показываем "печатает..." в правильном чате (если бот собирается отвечать)
-    const bizConnectionId = connectionId; // Only use if explicitly provided (business_message)
     if (!isCompleted) {
       await this.sendTypingAction(externalChatId, bizConnectionId);
     }
@@ -344,6 +373,28 @@ export class TelegramService {
     } catch (error: unknown) {
       console.error("SetWebhook Error:", error);
       throw error;
+    }
+  }
+
+  private async downloadTelegramFile(fileId: string, botToken: string): Promise<Buffer | null> {
+    try {
+      // 1. Get file path
+      const getFileRes = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+      if (!getFileRes.ok) throw new Error("Failed to get file info");
+
+      const fileData = await getFileRes.json();
+      const filePath = fileData.result?.file_path;
+      if (!filePath) throw new Error("No file_path in response");
+
+      // 2. Download file
+      const downloadRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+      if (!downloadRes.ok) throw new Error("Failed to download file");
+
+      const arrayBuffer = await downloadRes.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch (error) {
+      console.error("Error downloading Telegram file:", error);
+      return null;
     }
   }
 }

@@ -27,6 +27,22 @@ async function fetchKnowledgeBase(url: string): Promise<string> {
   }
 }
 
+import { toFile } from 'openai';
+
+export async function transcribeAudio(audioBuffer: Buffer, fileName: string): Promise<string> {
+  try {
+    const file = await toFile(audioBuffer, fileName, { type: 'audio/ogg' });
+    const transcription = await openai.audio.transcriptions.create({
+      file,
+      model: "whisper-1",
+    });
+    return transcription.text;
+  } catch (error) {
+    console.error("OpenAI Whisper Error:", error);
+    return "";
+  }
+}
+
 export async function generateAIResponse(systemPrompt: string, contextMessages: { role: 'user' | 'assistant'; content: string }[], knowledgeBaseUrl?: string) {
   try {
     let fullSystemPrompt = systemPrompt;

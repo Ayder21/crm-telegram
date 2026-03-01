@@ -22,6 +22,8 @@ export interface TelegramMessage {
   chat: TelegramChat;
   date: number;
   text?: string;
+  voice?: { file_id: string; duration: number };
+  audio?: { file_id: string; duration: number; mime_type?: string };
   reply_to_message?: TelegramMessage;
   business_connection_id?: string; // <-- ВАЖНО: ID находится здесь
 }
@@ -39,6 +41,6 @@ export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
   business_connection?: TelegramBusinessConnection;
-  business_message?: TelegramMessage; 
+  business_message?: TelegramMessage;
   edited_business_message?: TelegramMessage;
 }
