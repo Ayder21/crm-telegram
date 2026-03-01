@@ -130,17 +130,22 @@ export class TelegramService {
     const senderName = message.from?.first_name || "Unknown";
 
     // 2. Находим или создаем conversation
-    const conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
+    const { id: conversationId, status } = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
 
-    // UX: Показываем "печатает..." в правильном чате
+    // If the conversation already reached its goal, stop responding
+    const isCompleted = ['waiting_call', 'scheduled', 'closed_won', 'closed_lost'].includes(status);
+
+    // UX: Показываем "печатает..." в правильном чате (если бот собирается отвечать)
     const bizConnectionId = connectionId; // Only use if explicitly provided (business_message)
-    await this.sendTypingAction(externalChatId, bizConnectionId);
+    if (!isCompleted) {
+      await this.sendTypingAction(externalChatId, bizConnectionId);
+    }
 
     // DETERMINISTIC RULE: If text contains phone number, set status to 'waiting_call'
     // Regex matches common formats: +7999..., 8999..., +998..., 99890...
     const phoneRegex = /(?:\+|\b)(?:998|7|8)\d{9}\b|\+?\d{10,15}/;
     let statusTouched = false;
-    if (phoneRegex.test(text)) {
+    if (!isCompleted && phoneRegex.test(text)) {
       console.log(`[Rule] Phone number detected in "${text}". Force updating status to waiting_call.`);
       await supabaseAdmin
         .from('conversations')
@@ -171,9 +176,10 @@ export class TelegramService {
     // If a profile message already exists for this conversation, keep it up to date.
     await waitingCallChannelService.sync(conversationId);
 
-    // 5. Проверяем, включен ли AI
-    if (!integration.ai_enabled) {
-      console.log("AI disabled for this integration, skipping reply.");
+    // 5. Проверяем, включен ли AI и не закончен ли диалог
+    if (!integration.ai_enabled || isCompleted) {
+      if (isCompleted) console.log(`Conversation ${conversationId} is completed (status: ${status}). Ignoring message for AI.`);
+      else console.log("AI disabled for this integration, skipping reply.");
       return;
     }
 
@@ -184,25 +190,26 @@ export class TelegramService {
   private async getOrCreateConversation(integrationId: string, externalChatId: string, customerName: string) {
     const { data: existing } = await supabaseAdmin
       .from('conversations')
-      .select('id')
+      .select('id, status')
       .eq('integration_id', integrationId)
       .eq('external_chat_id', externalChatId)
       .single();
 
-    if (existing) return existing.id;
+    if (existing) return existing;
 
     const { data: newConv, error } = await supabaseAdmin
       .from('conversations')
       .insert({
         integration_id: integrationId,
         external_chat_id: externalChatId,
-        customer_name: customerName
+        customer_name: customerName,
+        status: 'new'
       })
-      .select('id')
+      .select('id, status')
       .single();
 
     if (error) throw error;
-    return newConv.id;
+    return newConv;
   }
 
   private async triggerAIReply(integration: IntegrationConfig, conversationId: string, chatId: string, _replyToMessageId: number, connectionId?: string) {

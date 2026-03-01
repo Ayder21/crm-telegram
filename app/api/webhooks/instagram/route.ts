@@ -83,7 +83,10 @@ export async function POST(req: NextRequest) {
                 }
 
                 // Get or create conversation
-                const conversationId = await getOrCreateConversation(integration.id, senderId, senderId);
+                const { id: conversationId, status } = await getOrCreateConversation(integration.id, senderId, senderId);
+
+                // If the conversation already reached its goal, stop responding
+                const isCompleted = ['waiting_call', 'scheduled', 'closed_won', 'closed_lost'].includes(status);
 
                 // Check for duplicate message
                 const { data: lastMsg } = await supabaseAdmin
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest) {
 
                 // Generate & send AI reply
                 const aiEnabled = integration.ai_enabled !== false;
-                if (aiEnabled) {
+                if (aiEnabled && !isCompleted) {
                     const { data: history } = await supabaseAdmin
                         .from('messages')
                         .select('sender, content')
@@ -124,15 +127,34 @@ export async function POST(req: NextRequest) {
                     const systemPrompt = integration.system_prompt || 'You are a helpful assistant.';
                     const aiReply = await generateAIResponse(systemPrompt, contextMessages, integration.knowledge_base_url);
 
-                    console.log(`[IG Webhook] Sending reply to ${senderId}: "${aiReply}"`);
-                    await sendIgMessage(accessToken, senderId, aiReply);
+                    // Handle status updates within the AI reply
+                    let finalResponse = aiReply;
+                    const statusMatch = aiReply.match(/\[\[UPDATE_STATUS:\s*([a-z_]+)\s*\]\]/);
+                    if (statusMatch) {
+                        const newStatus = statusMatch[1];
+                        finalResponse = aiReply.replace(statusMatch[0], "").trim();
+                        console.log(`[IG Webhook] AI changing status to: ${newStatus}`);
+                        await supabaseAdmin
+                            .from('conversations')
+                            .update({ status: newStatus })
+                            .eq('id', conversationId);
+                    }
+
+                    if (finalResponse) {
+                        console.log(`[IG Webhook] Sending reply to ${senderId}: "${finalResponse}"`);
+                        await sendIgMessage(accessToken, senderId, finalResponse);
+                    }
 
                     await supabaseAdmin.from('messages').insert({
                         conversation_id: conversationId,
                         sender: 'assistant',
-                        content: aiReply,
+                        content: finalResponse || "(Status Update Only)",
                     });
-                    await updateLeadProfileFromMessage(conversationId, aiReply);
+                    if (finalResponse) {
+                        await updateLeadProfileFromMessage(conversationId, finalResponse);
+                    }
+                } else if (isCompleted) {
+                    console.log(`[IG Webhook] Conversation ${conversationId} is completed (status: ${status}). Ignoring message for AI.`);
                 }
             }
         }
@@ -165,12 +187,12 @@ async function sendIgMessage(accessToken: string, recipientIgsid: string, text: 
 async function getOrCreateConversation(integrationId: string, externalChatId: string, customerName: string) {
     const { data: existing } = await supabaseAdmin
         .from('conversations')
-        .select('id')
+        .select('id, status')
         .eq('integration_id', integrationId)
         .eq('external_chat_id', externalChatId)
         .single();
 
-    if (existing) return existing.id;
+    if (existing) return existing;
 
     const { data: newConv, error } = await supabaseAdmin
         .from('conversations')
@@ -178,10 +200,11 @@ async function getOrCreateConversation(integrationId: string, externalChatId: st
             integration_id: integrationId,
             external_chat_id: externalChatId,
             customer_name: customerName,
+            status: 'new'
         })
-        .select('id')
+        .select('id, status')
         .single();
 
     if (error) throw error;
-    return newConv.id;
+    return newConv;
 }
