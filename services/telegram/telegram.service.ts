@@ -30,23 +30,20 @@ export class TelegramService {
   private integration: IntegrationConfig | null = null;
 
   async handleWebhook(update: TelegramUpdate, integration?: IntegrationConfig, botToken?: string) {
-    // Store integration and token for this webhook request
     if (integration) this.integration = integration;
     if (botToken) this.botToken = botToken;
-    // 1. Сохраняем connection_id, если пришел апдейт статуса
+
     if (update.business_connection) {
       await this.handleBusinessConnection(update.business_connection);
       return;
     }
 
-    // 2. Определяем тип сообщения (бизнес или обычное)
-    const message = update.business_message || update.message;
-
-    if (message) {
-      // ВАЖНО: business_connection_id находится ВНУТРИ сообщения для business_message
+    if (update.business_message) {
+      const message = update.business_message;
       const connectionId = message.business_connection_id;
-
       await this.processIncomingMessage(message, connectionId);
+    } else if (update.message) {
+      await this.processIncomingMessage(update.message);
     }
   }
 
@@ -136,7 +133,7 @@ export class TelegramService {
     const conversationId = await this.getOrCreateConversation(integration.id, externalChatId, senderName);
 
     // UX: Показываем "печатает..." в правильном чате
-    const bizConnectionId = connectionId || integration.session_data?.business_connection_id;
+    const bizConnectionId = connectionId; // Only use if explicitly provided (business_message)
     await this.sendTypingAction(externalChatId, bizConnectionId);
 
     // DETERMINISTIC RULE: If text contains phone number, set status to 'waiting_call'
@@ -245,7 +242,7 @@ export class TelegramService {
     }
 
     // 3. Отправляем в Telegram
-    const bizConnectionId = connectionId || integration.session_data?.business_connection_id;
+    const bizConnectionId = connectionId; // Only use if explicitly provided
 
     if (finalResponse) {
       // Sanitize response for Telegram HTML support
