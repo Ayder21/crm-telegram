@@ -26,6 +26,13 @@ type TelegramApiBody = {
   business_connection_id?: string;
 };
 
+type TelegramApiResponse<T = unknown> = {
+  ok: boolean;
+  result?: T;
+  description?: string;
+  error_code?: number;
+};
+
 export class TelegramService {
   private botToken: string = process.env.TELEGRAM_BOT_TOKEN || '';
   private integration: IntegrationConfig | null = null;
@@ -318,19 +325,39 @@ export class TelegramService {
       body.business_connection_id = businessConnectionId;
     }
 
+    let res: Response;
     try {
-      const res = await fetch(url, {
+      res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error("Telegram API Error:", err);
-      }
     } catch (error: unknown) {
-      console.error("Fetch Error:", error);
+      console.error("Telegram send fetch failed:", error);
+      throw error instanceof Error ? error : new Error("Telegram send fetch failed");
     }
+
+    let payload: TelegramApiResponse | null = null;
+    try {
+      payload = await res.json() as TelegramApiResponse;
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok || !payload?.ok) {
+      const description = payload?.description || `HTTP ${res.status}`;
+      const error = new Error(`Telegram send failed: ${description}`);
+      console.error("Telegram API Error:", {
+        chatId,
+        businessConnectionId,
+        status: res.status,
+        description: payload?.description,
+        errorCode: payload?.error_code
+      });
+      throw error;
+    }
+
+    return payload.result;
   }
 
   public async sendTypingAction(chatId: string, businessConnectionId?: string) {
